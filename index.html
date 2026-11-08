@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d4f91">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Reporte Pastoral">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Reporte Pastoral</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+/* Una sola columna pensada para el teléfono: encabezado fijo con el pastor y el mes, pestañas, un formulario por pestaña. */
+:root{
+  --bg:#f3f5f8;--surface:#fff;--ink:#152033;--muted:#5d6879;--line:#d7dde6;
+  --accent:#1d4f91;--accent-ink:#fff;--gold:#b98a1e;
+  --ok:#1f7a4a;--ok-bg:#e6f4ec;--warn:#8a5a00;--warn-bg:#fdf3dc;--bad:#b3261e;--bad-bg:#fbe9e7;
+  --display:"Archivo",system-ui,sans-serif;--body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1520;--surface:#18202d;--ink:#e7ecf3;--muted:#9aa6b8;--line:#2b3546;
+  --accent:#6ea2e6;--accent-ink:#0b1320;--gold:#e0b44c;
+  --ok:#5fd193;--ok-bg:#15301f;--warn:#f0c060;--warn-bg:#352a10;--bad:#ff8a80;--bad-bg:#3a1714;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.4}
+body{padding-bottom:env(safe-area-inset-bottom)}
+header{background:var(--surface);border-bottom:3px solid var(--gold);padding:calc(12px + env(safe-area-inset-top)) 16px 12px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+h1{font-family:var(--display);font-weight:800;font-size:1.35rem;margin:0;color:var(--accent)}
+.sub{color:var(--muted);font-size:.9rem}
+.quien{margin-top:6px;font-weight:700}
+.mes{display:inline-block;margin-top:6px;background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:3px 12px;font-weight:700;font-size:.9rem}
+.salir{font:inherit;font-size:.85rem;font-weight:700;color:var(--accent);background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+nav{display:flex;gap:4px;overflow-x:auto;padding:10px 16px 0;position:sticky;top:0;background:var(--bg);z-index:5}
+nav button{font:inherit;font-weight:700;font-size:.93rem;border:1px solid var(--line);border-bottom:none;background:transparent;color:var(--muted);padding:10px 12px;border-radius:10px 10px 0 0;cursor:pointer;white-space:nowrap}
+nav button[aria-selected="true"]{background:var(--surface);color:var(--accent)}
+main{max-width:760px;margin:0 auto;padding:0 16px 40px}
+section.tab{background:var(--surface);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:16px}
+section[hidden]{display:none}
+h2{font-family:var(--display);font-size:1.12rem;margin:0 0 4px}
+p.help{color:var(--muted);margin:0 0 12px;font-size:.92rem}
+input,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:1px}
+table.rep{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.rep td{border:1px solid var(--line);padding:6px 8px;vertical-align:middle}
+table.rep td.n{width:2.1em;text-align:center;color:var(--muted);font-weight:700}
+table.rep td.v{width:40%}
+table.rep input{width:100%;text-align:right}
+table.rep input[readonly]{background:var(--bg);color:var(--accent);font-weight:700;border-style:dashed}
+table.rep tr.tot td{font-weight:800;background:var(--bg)}
+table.rep tr.tot input{border:none;background:transparent;color:var(--ink);font-size:1.1rem}
+.auto{font-size:.74rem;color:var(--gold);font-weight:700;margin-left:4px}
+.miss{display:flex;flex-direction:column;gap:2px;margin-top:6px;font-size:.82rem;color:var(--muted)}
+table.rep .miss input{text-align:left}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:.84rem;color:var(--muted);font-weight:600}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px 12px;margin:0 0 14px}
+legend{font-family:var(--display);font-weight:700;color:var(--accent);padding:0 6px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.btn{font:inherit;font-weight:700;border-radius:10px;padding:11px 18px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer;text-decoration:none;display:inline-block}
+.btn.sec{background:transparent;color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.msg{border-radius:10px;padding:10px 12px;margin-top:12px;font-weight:600}
+.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}.msg.warn{background:var(--warn-bg);color:var(--warn)}.msg.info{background:var(--bg);color:var(--muted)}
+.msg[hidden]{display:none}
+.photo{margin-top:12px;border:1px dashed var(--line);border-radius:12px;min-height:150px;display:grid;place-items:center;overflow:hidden;background:var(--bg)}
+.photo img{max-width:100%;max-height:460px;display:block}
+.photo .ph{color:var(--muted);padding:24px;text-align:center}
+.prev{margin-top:16px;border:1px solid var(--line);border-radius:10px}
+.prev summary{padding:10px 12px;cursor:pointer;font-weight:700;color:var(--accent)}
+.prev .body{padding:0 12px 12px}
+.prev table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:.92rem}
+.prev td{padding:4px 2px;border-bottom:1px solid var(--line)} .prev td:last-child{text-align:right}
+/* login */
+.login{max-width:380px;margin:12vh auto 0;padding:24px 20px;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:14px}
+.login h1{font-size:1.6rem}
+.login input{width:100%;font-size:1.4rem;letter-spacing:.3em;text-align:center;margin-top:10px}
+.login .btn{width:100%;margin-top:12px}
+/* admin */
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:140px;flex:1}
+.kpi span{display:block;font-size:.78rem;color:var(--muted);font-weight:700}
+.kpi b{font-family:var(--display);font-size:1.2rem;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto;margin-top:12px}
+table.gen{border-collapse:collapse;font-size:.84rem;font-variant-numeric:tabular-nums;min-width:100%}
+table.gen th,table.gen td{border:1px solid var(--line);padding:4px 6px;white-space:nowrap}
+table.gen th{background:var(--bg);text-align:left}
+table.gen td.num{text-align:right}
+table.gen tr.falta td{color:var(--muted);font-style:italic}
+table.gen tfoot td{font-weight:800;background:var(--bg)}
+.pill{display:inline-block;font-size:.75rem;font-weight:700;border-radius:99px;padding:1px 8px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ ENTRADA ============ -->
+<div id="vLogin" class="login">
+  <h1>Reporte Pastoral</h1>
+  <div class="sub">Asambleas de Dios · Sección Jutiapa</div>
+  <form id="fLogin">
+    <label class="f" for="inPin" style="margin-top:18px">Escriba su PIN personal</label>
+    <input id="inPin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8" required>
+    <button class="btn" type="submit" id="bEntrar">Entrar</button>
+    <div class="msg" id="mLogin" hidden></div>
+  </form>
+</div>
+
+<!-- ============ APLICACIÓN ============ -->
+<div id="vApp" hidden>
+<header>
+  <div class="top"><h1>Reporte Pastoral</h1><button class="salir" id="bSalir" type="button">Salir</button></div>
+  <div class="quien" id="hdrNombre"></div>
+  <div class="sub" id="hdrIglesia"></div>
+  <span class="mes" id="hdrMes"></span>
+</header>
+
+<nav role="tablist" id="nav"></nav>
+
+<main>
+<!-- Financiero -->
+<section class="tab" id="tFin" hidden>
+  <h2>Reporte financiero</h2>
+  <p class="help">Escriba las cantidades en quetzales. La jubilación y el total se calculan solos.</p>
+  <form id="fFin" autocomplete="off">
+    <table class="rep"><tbody id="finBody"></tbody></table>
+    <div class="actions"><button class="btn" type="submit" id="bFin">Guardar reporte</button></div>
+    <div class="msg" id="mFin" hidden></div>
+  </form>
+  <details class="prev" id="prevBox" hidden><summary id="prevTit"></summary><div class="body"><table id="prevTab"></table></div></details>
+</section>
+
+<!-- Estadístico -->
+<section class="tab" id="tEst" hidden>
+  <h2>Reporte estadístico</h2>
+  <p class="help">Escriba solo números enteros. El total de membresía se suma solo.</p>
+  <form id="fEst" autocomplete="off">
+    <fieldset><legend>Membresía</legend><div class="grid2" id="estMem"></div></fieldset>
+    <fieldset><legend>Ministerio de la iglesia</legend><div class="grid2" id="estMin"></div></fieldset>
+    <fieldset><legend>Membresía por departamentos</legend><div class="grid2" id="estDep"></div></fieldset>
+    <div class="actions"><button class="btn" type="submit" id="bEst">Guardar reporte estadístico</button></div>
+    <div class="msg" id="mEst" hidden></div>
+  </form>
+</section>
+
+<!-- Foto -->
+<section class="tab" id="tFoto" hidden>
+  <h2>Foto del depósito bancario</h2>
+  <p class="help">Tome la foto de la boleta completa, derecha y con buena luz. La foto se revisa automáticamente para confirmar que se pueda leer.</p>
+  <div class="actions"><span class="btn filebtn"><span id="lblFoto">Tomar foto</span><input type="file" id="inFoto" accept="image/*" capture="environment" aria-label="Tomar foto de la boleta"></span></div>
+  <div class="photo" id="fotoBox"><div class="ph">Todavía no hay foto para este mes.</div></div>
+  <div class="msg" id="mFoto" hidden></div>
+  <div class="actions">
+    <button class="btn" type="button" id="bGuardarFoto" disabled>Guardar foto</button>
+    <button class="btn sec" type="button" id="bOtra" hidden>Tomar de nuevo</button>
+  </div>
+</section>
+
+<!-- Administrador -->
+<section class="tab" id="tGen" hidden>
+  <h2>Reporte general</h2>
+  <p class="help">Reportes de todos los pastores del mes elegido. Descargue el Excel (mismo orden de columnas que la hoja GENERAL) y las fotos de las boletas.</p>
+  <div class="actions">
+    <label class="f" for="selMesGen">Mes<select id="selMesGen"></select></label>
+    <button class="btn sec" type="button" id="bCargar">Consultar</button>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" id="bExcel" disabled>Descargar Excel</button>
+    <button class="btn" type="button" id="bZip" disabled>Descargar fotos</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="msg" id="mGen" hidden></div>
+  <div class="tablewrap"><table class="gen" id="genTab"></table></div>
+</section>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script>
+"use strict";
+const MESES=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const FIN=[
+ {k:"diezIglesia",t:"Diezmos de iglesia"},{k:"diezPastor",t:"Diezmos del pastor"},
+ {k:"jubPastor",t:"Jubilación del pastor",auto:"diezPastor"},{k:"jubIglesia",t:"Jubilación de la iglesia",auto:"diezIglesia"},
+ {k:"evangelismo",t:"Evangelismo"},{k:"cmf",t:"CMF"},{k:"fdv",t:"FDV"},{k:"embajadores",t:"Embajadores de Cristo"},
+ {k:"escDominical",t:"Escuela dominical"},{k:"misioneritas",t:"Misioneritas"},{k:"exploradores",t:"Exploradores"},
+ {k:"proviudas",t:"Pro-viudas"},{k:"africa",t:"Misioneros de África"},{k:"diezMisiones",t:"Diezmos de misiones"},
+ {k:"ofrenda",t:"Ofrenda misioneros foráneos",mis:true},{k:"banco",t:"Pago a Banco G&T Continental",def:3}];
+const EST={
+ estMem:[["propiedad","Miembros en propiedad"],["catecumenos","Miembros catecúmenos"],["ninos","Niños"],["otros","Otros"],["totalMem","Total",1]],
+ estMin:[["evangelizados","Evangelizados"],["aceptados","Aceptados"],["reconciliados","Reconciliados"],["discipulados","Discipulados"],["bautAgua","Bautizados en agua"],["promEscDom","Promedio de Escuela Dominical"],["bautEspiritu","Bautizados en el Espíritu Santo"],["camposBlancos","Campos blancos"],["obreros","Obreros locales"]],
+ estDep:[["depCMF","Concilio Misionero Femenil"],["depFDV","Fraternidad de Varones"],["depEmb","Embajadores de Cristo"],["depMis","Misioneritas"],["depExp","Exploradores"]]};
+const $=id=>document.getElementById(id);
+const r2=n=>Math.round((Number(n)||0)*100)/100;
+const num=s=>{const n=parseFloat(String(s==null?"":s).replace(/,/g,""));return isFinite(n)?n:0};
+const q=v=>"Q"+(Number(v)||0).toLocaleString("es-GT",{minimumFractionDigits:2,maximumFractionDigits:2});
+const mesTexto=k=>{const [y,m]=String(k).split("-");return MESES[+m-1]+" "+y};
+function show(el,cls,t){el.className="msg "+cls;el.textContent=t;el.hidden=!t}
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return null}}
+
+let PIN=null, S=null; // S = respuesta del servidor al entrar
+
+async function api(accion,extra){
+  if(!window.API_URL) throw new Error("La aplicación no está configurada (falta la dirección del servidor).");
+  const r=await fetch(window.API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({accion,pin:PIN},extra||{}))});
+  if(!r.ok) throw new Error("El servidor no respondió. Revise su conexión.");
+  const j=await r.json(); if(!j.ok) throw new Error(j.error||"Ocurrió un error.");
+  return j;
+}
+
+/* ---------- entrada ---------- */
+$("fLogin").addEventListener("submit",async e=>{e.preventDefault();PIN=$("inPin").value.trim();
+  $("bEntrar").disabled=true;show($("mLogin"),"info","Entrando…");
+  try{S=await api("entrar");ls("rp_pin",PIN);iniciar()}
+  catch(err){PIN=null;show($("mLogin"),"bad",err.message)}
+  $("bEntrar").disabled=false});
+$("bSalir").onclick=()=>{ls("rp_pin",null);location.reload()};
+
+/* ---------- pestañas ---------- */
+function pestanas(lista){const nav=$("nav");nav.textContent="";
+  lista.forEach(([id,t],i)=>{const b=document.createElement("button");b.type="button";b.role="tab";b.textContent=t;b.dataset.t=id;
+    b.onclick=()=>abrir(id);nav.append(b)});abrir(lista[0][0])}
+function abrir(id){document.querySelectorAll("section.tab").forEach(s=>s.hidden=s.id!==id);
+  document.querySelectorAll("#nav button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.t===id)))}
+
+function iniciar(){
+  $("vLogin").hidden=true;$("vApp").hidden=false;
+  if(S.admin){$("hdrNombre").textContent="Administrador";$("hdrIglesia").textContent="Sección Jutiapa";$("hdrMes").hidden=true;
+    pestanas([["tGen","Reporte general"]]);prepararAdmin();return}
+  const p=S.pastor;$("hdrNombre").textContent=p.nombre;$("hdrIglesia").textContent="Iglesia "+p.iglesia+" · "+p.lugar;
+  $("hdrMes").textContent="Reporte de "+mesTexto(S.mes);
+  pestanas([["tFin","Reporte financiero"],["tEst","Reporte estadístico"],["tFoto","Foto del depósito"]]);
+  armarFin();armarEst();armarFoto();
+}
+
+/* ---------- financiero ---------- */
+function armarFin(){
+  const p=S.pastor,body=$("finBody");body.textContent="";
+  FIN.forEach((f,i)=>{
+    const tr=document.createElement("tr");
+    const n=document.createElement("td");n.className="n";n.textContent=i+1;
+    const l=document.createElement("td");const lab=document.createElement("label");lab.htmlFor="fin_"+f.k;lab.textContent=f.t;l.append(lab);
+    const v=document.createElement("td");v.className="v";const inp=document.createElement("input");inp.id="fin_"+f.k;inp.inputMode="decimal";inp.placeholder="0.00";
+    if(f.auto){inp.readOnly=true;inp.tabIndex=-1;const s=document.createElement("span");s.className="auto";s.textContent="automático";l.append(s)}
+    if(f.k==="jubPastor"&&!p.pagaJub){inp.value="";inp.placeholder="No aplica";l.querySelector(".auto").textContent="no aplica"}
+    if(f.mis){const w=document.createElement("label");w.className="miss";w.htmlFor="fin_misionero";w.textContent="Nombre del misionero";
+      const m=document.createElement("input");m.id="fin_misionero";m.value=p.misionero||"";m.placeholder="Escriba el nombre";w.append(m);l.append(w)}
+    if(f.def!=null) inp.value=f.def.toFixed(2);
+    v.append(inp);tr.append(n,l,v);body.append(tr)});
+  const tr=document.createElement("tr");tr.className="tot";
+  const a=document.createElement("td");a.className="n";a.textContent=FIN.length+1;const b=document.createElement("td");b.textContent="TOTAL";
+  const c=document.createElement("td");c.className="v";const t=document.createElement("input");t.id="fin_total";t.readOnly=true;t.tabIndex=-1;t.setAttribute("aria-label","Total");c.append(t);tr.append(a,b,c);body.append(tr);
+  if(S.actual.fin) ponerFin(S.actual.fin); calcFin();
+  body.addEventListener("input",calcFin);
+  body.addEventListener("blur",e=>{const i=e.target;if(i.tagName==="INPUT"&&!i.readOnly&&i.id!=="fin_misionero"&&i.value!=="")i.value=r2(num(i.value)).toFixed(2)},true);
+  if(S.actual.fin) show($("mFin"),"ok","Ya guardó su reporte de "+mesTexto(S.mes)+" ("+q(S.actual.fin.total)+"). Puede corregirlo y guardarlo de nuevo hasta fin de mes.");
+  // reporte anterior (solo consulta)
+  const an=S.anterior;
+  if(an&&an.fin){$("prevBox").hidden=false;$("prevTit").textContent="Ver su reporte anterior ("+mesTexto(an.mes)+") · "+q(an.fin.total);
+    const tb=$("prevTab");tb.textContent="";
+    FIN.forEach(f=>{const v=an.fin[f.k];if(!v)return;const tr=document.createElement("tr");const a=document.createElement("td");a.textContent=f.t+(f.mis&&an.fin.misionero?" ("+an.fin.misionero+")":"");const b=document.createElement("td");b.textContent=q(v);tr.append(a,b);tb.append(tr)});
+    const tr=document.createElement("tr");const a=document.createElement("td");a.textContent="Total";a.style.fontWeight="800";const b=document.createElement("td");b.textContent=q(an.fin.total);b.style.fontWeight="800";tr.append(a,b);tb.append(tr)}
+}
+function ponerFin(fin){FIN.forEach(f=>{if(f.auto)return;const v=fin[f.k];$("fin_"+f.k).value=v?Number(v).toFixed(2):""});if(fin.misionero)$("fin_misionero").value=fin.misionero}
+function calcFin(){
+  const pj=S.pastor.pagaJub;
+  const dp=num($("fin_diezPastor").value),di=num($("fin_diezIglesia").value);
+  $("fin_jubPastor").value=pj&&dp?r2(dp*.2).toFixed(2):"";
+  $("fin_jubIglesia").value=di?r2(di*.2).toFixed(2):"";
+  const t=r2(FIN.reduce((a,f)=>a+num($("fin_"+f.k).value),0));$("fin_total").value=q(t);return t}
+$("fFin").addEventListener("submit",async e=>{e.preventDefault();const t=calcFin();
+  if(t<=0){show($("mFin"),"bad","Escriba al menos una cantidad antes de guardar.");return}
+  const d={};FIN.forEach(f=>d[f.k]=num($("fin_"+f.k).value));d.misionero=$("fin_misionero").value.trim();
+  $("bFin").disabled=true;show($("mFin"),"info","Guardando…");
+  try{const r=await api("guardarFin",{datos:d});S.actual.fin=r.fin;show($("mFin"),"ok","Reporte de "+mesTexto(r.mes)+" guardado. Total "+q(r.total)+".")}
+  catch(err){show($("mFin"),"bad",err.message)}
+  $("bFin").disabled=false});
+
+/* ---------- estadístico ---------- */
+function armarEst(){
+  Object.entries(EST).forEach(([box,list])=>{$(box).textContent="";list.forEach(([k,t,auto])=>{
+    const l=document.createElement("label");l.className="f";l.htmlFor="est_"+k;l.textContent=t+(auto?" (automático)":"");
+    const i=document.createElement("input");i.id="est_"+k;i.inputMode="numeric";i.placeholder="0";if(auto){i.readOnly=true;i.tabIndex=-1}
+    l.append(i);$(box).append(l)})});
+  const e=S.actual.est;if(e)Object.values(EST).flat().forEach(([k])=>$("est_"+k).value=e[k]||"");
+  calcEst();$("fEst").addEventListener("input",calcEst);
+  if(e) show($("mEst"),"ok","Ya guardó su reporte estadístico de "+mesTexto(S.mes)+". Puede corregirlo hasta fin de mes.");
+}
+function calcEst(){$("est_totalMem").value=["propiedad","catecumenos","ninos","otros"].reduce((a,k)=>a+Math.round(num($("est_"+k).value)),0)}
+$("fEst").addEventListener("submit",async e=>{e.preventDefault();calcEst();
+  const d={};Object.values(EST).flat().forEach(([k])=>d[k]=Math.round(num($("est_"+k).value)));
+  $("bEst").disabled=true;show($("mEst"),"info","Guardando…");
+  try{const r=await api("guardarEst",{datos:d});S.actual.est=r.est;show($("mEst"),"ok","Reporte estadístico de "+mesTexto(r.mes)+" guardado.")}
+  catch(err){show($("mEst"),"bad",err.message)}
+  $("bEst").disabled=false});
+
+/* ---------- foto ---------- */
+let tempId=null;
+function verFoto(src){const b=$("fotoBox");b.textContent="";if(!src){const d=document.createElement("div");d.className="ph";d.textContent="Todavía no hay foto para este mes.";b.append(d);return}
+  const i=document.createElement("img");i.src=src;i.alt="Foto de la boleta de depósito";b.append(i)}
+function armarFoto(){const f=S.actual.foto;
+  if(f){$("lblFoto").textContent="Cambiar foto";const b=$("fotoBox");b.textContent="";const d=document.createElement("div");d.className="ph";
+    d.textContent="Foto guardada el "+f.subida+(f.monto?" · monto leído "+q(f.monto):"")+".";b.append(d);
+    show($("mFoto"),"ok","Ya envió la foto de su depósito de "+mesTexto(S.mes)+".")}}
+async function reducir(file){
+  const img=await createImageBitmap(file).catch(()=>null);if(!img)throw new Error("No se pudo abrir la foto. Tómela de nuevo.");
+  const max=1600,s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement("canvas");
+  c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  return c.toDataURL("image/jpeg",0.85)}
+$("inFoto").addEventListener("change",async e=>{
+  const file=e.target.files&&e.target.files[0];e.target.value="";if(!file)return;
+  tempId=null;$("bGuardarFoto").disabled=true;$("bOtra").hidden=true;
+  try{
+    const url=await reducir(file);verFoto(url);show($("mFoto"),"info","Revisando si la boleta se puede leer…");
+    const r=await api("revisarFoto",{imagen:{tipo:"image/jpeg",data:url.split(",")[1]}});
+    const a=r.analisis||{};tempId=r.tempId;$("bOtra").hidden=false;
+    if(a.legible===false){tempId=null;show($("mFoto"),"bad","La foto no es legible"+(a.motivo?": "+a.motivo:"")+". Vuelva a tomarla.");return}
+    let t=a.legible===true?"La boleta se puede leer.":"No se pudo revisar automáticamente; confirme que se lean el monto, la fecha y el número de documento.";
+    if(a.monto) t+=" Monto: "+q(a.monto)+".";if(a.fecha) t+=" Fecha: "+a.fecha+".";
+    const tot=r.totalReporte;
+    if(tot&&a.monto&&Math.abs(tot-a.monto)>0.005){show($("mFoto"),"warn",t+" Atención: su reporte suma "+q(tot)+" y la boleta dice "+q(a.monto)+". Revise antes de guardar.")}
+    else show($("mFoto"),a.legible===true?"ok":"warn",t);
+    $("bGuardarFoto").disabled=false;
+  }catch(err){show($("mFoto"),"bad",err.message);$("bOtra").hidden=false}
+});
+$("bOtra").onclick=()=>$("inFoto").click();
+$("bGuardarFoto").onclick=async()=>{if(!tempId)return;$("bGuardarFoto").disabled=true;show($("mFoto"),"info","Guardando foto…");
+  try{const r=await api("guardarFoto",{tempId});S.actual.foto=r.foto;tempId=null;$("bOtra").hidden=true;$("lblFoto").textContent="Cambiar foto";
+    show($("mFoto"),"ok","Foto del depósito guardada. ¡Gracias!")}
+  catch(err){$("bGuardarFoto").disabled=false;show($("mFoto"),"bad",err.message)}};
+
+/* ---------- administrador ---------- */
+let G=null;
+function prepararAdmin(){
+  const sel=$("selMesGen");sel.textContent="";const meses=Array.from(new Set([S.mes].concat(S.meses||[]))).sort().reverse();
+  meses.forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=mesTexto(m);sel.append(o)});
+  cargarGen()}
+$("bCargar").onclick=cargarGen;$("selMesGen").onchange=cargarGen;
+async function cargarGen(){
+  const mes=$("selMesGen").value;$("bExcel").disabled=true;$("bZip").disabled=true;show($("mGen"),"info","Consultando "+mesTexto(mes)+"…");
+  try{G=await api("general",{mes});pintarGen();$("bExcel").disabled=false;$("bZip").disabled=!G.filas.some(f=>f.foto);
+    const n=G.filas.filter(f=>f.fin).length,tot=G.filas.length;
+    const faltan=G.filas.filter(f=>!f.fin).map(f=>f.pastor.nombre);
+    show($("mGen"),n===tot?"ok":"warn",n===tot?"Ya reportaron los "+n+" pastores.":"Han reportado "+n+" de "+tot+". Faltan: "+faltan.join(", ")+".")}
+  catch(err){show($("mGen"),"bad",err.message)}}
+function pintarGen(){
+  const t=$("genTab");t.textContent="";let total=0,fotos=0,dep=0;const sum={};
+  const hr=document.createElement("tr");["No.","Pastor"].concat(FIN.map(f=>f.t),["Total","Misionero","Estadística","Foto","Monto boleta"]).forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.append(th)});
+  const th=document.createElement("thead");th.append(hr);t.append(th);const tb=document.createElement("tbody");
+  G.filas.forEach((f,i)=>{const tr=document.createElement("tr");if(!f.fin)tr.className="falta";
+    const td=(v,cls)=>{const c=document.createElement("td");if(cls)c.className=cls;if(v instanceof Node)c.append(v);else c.textContent=v;tr.append(c)};
+    td(i+1);td(f.pastor.nombre);
+    FIN.forEach(x=>{const v=f.fin?f.fin[x.k]:0;sum[x.k]=r2((sum[x.k]||0)+(v||0));td(v?Number(v).toFixed(2):"","num")});
+    if(f.fin)total=r2(total+f.fin.total);td(f.fin?q(f.fin.total):"sin reporte","num");td(f.fin&&f.fin.misionero||"");
+    const pe=document.createElement("span");pe.className="pill "+(f.est?"ok":"bad");pe.textContent=f.est?"Sí":"Falta";td(pe);
+    if(f.foto){fotos++;if(f.foto.monto)dep=r2(dep+f.foto.monto);const a=document.createElement("a");a.href=f.foto.enlace;a.target="_blank";a.rel="noopener";
+      a.textContent=f.foto.legible==="SI"?"Ver":"Ver (sin verificar)";td(a)}else{const s=document.createElement("span");s.className="pill bad";s.textContent="Falta";td(s)}
+    const dif=f.fin&&f.foto&&f.foto.monto!=null&&Math.abs(f.fin.total-f.foto.monto)>0.005;
+    if(dif){const s=document.createElement("span");s.className="pill warn";s.textContent=q(f.foto.monto)+" ≠ reporte";td(s,"num")}else td(f.foto&&f.foto.monto?q(f.foto.monto):"","num");
+    tb.append(tr)});
+  t.append(tb);const tf=document.createElement("tfoot");const fr=document.createElement("tr");
+  const fc=v=>{const c=document.createElement("td");c.className="num";c.textContent=v;fr.append(c)};
+  fc("");fc("Total");FIN.forEach(x=>fc(sum[x.k]?sum[x.k].toFixed(2):""));fc(q(total));fc("");fc("");fc("");fc(dep?q(dep):"");tf.append(fr);t.append(tf);
+  const k=$("kpis");k.textContent="";
+  [["Total reportado",q(total)],["Pastores con reporte",G.filas.filter(f=>f.fin).length+" de "+G.filas.length],["Fotos de depósito",fotos+" de "+G.filas.length],["Suma leída en boletas",q(dep)]]
+   .forEach(([a,b])=>{const d=document.createElement("div");d.className="kpi";const s=document.createElement("span");s.textContent=a;const v=document.createElement("b");v.textContent=b;d.append(s,v);k.append(d)});
+}
+function bajar(blob,nombre){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nombre;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
+$("bExcel").onclick=()=>{
+  if(!G||!window.XLSX){show($("mGen"),"bad","No se pudo preparar el Excel. Revise su conexión y vuelva a intentar.");return}
+  const [y,m]=G.mes.split("-");const n=G.filas.length;
+  const gen=[["NO.","NOMBRE DEL PASTOR","LUGAR","IGLESIA"].concat(G.rubros,["TOTAL","NOMBRE DEL MISIONERO","","MES","AÑO"])];
+  const est=[["NO.","NOMBRE DEL PASTOR","LUGAR","IGLESIA"].concat(G.est)];
+  const fot=[["NO.","NOMBRE DEL PASTOR","TOTAL REPORTE","MONTO BOLETA","DIFERENCIA","FECHA BOLETA","DOCUMENTO","LEGIBLE","ENLACE A LA FOTO"]];
+  const ek=Object.values(EST).flat().map(x=>x[0]);
+  G.filas.forEach((f,i)=>{const p=f.pastor;
+    gen.push([i+1,p.nombre,p.lugar,p.iglesia].concat(FIN.map(x=>f.fin&&f.fin[x.k]?f.fin[x.k]:null),[f.fin?f.fin.total:null,f.fin&&f.fin.misionero||"","",i===0?MESES[+m-1].toUpperCase():"",i===0?+y:""]));
+    est.push([i+1,p.nombre,p.lugar,p.iglesia].concat(ek.map(k=>f.est?f.est[k]:null)));
+    fot.push([i+1,p.nombre,f.fin?f.fin.total:null,f.foto&&f.foto.monto!=null?f.foto.monto:null,f.fin&&f.foto&&f.foto.monto!=null?r2(f.fin.total-f.foto.monto):null,
+      f.foto?f.foto.fecha:"",f.foto?f.foto.documento:"",f.foto?f.foto.legible:"FALTA",f.foto?f.foto.enlace:""])});
+  const tot=["","","","Total:"];"EFGHIJKLMNOPQRSTU".split("").forEach(c=>tot.push({f:"SUM("+c+"2:"+c+(n+1)+")"}));gen.push(tot);
+  const wb=XLSX.utils.book_new();const ws=XLSX.utils.aoa_to_sheet(gen);
+  ws["!cols"]=[{wch:5},{wch:30},{wch:20},{wch:24}].concat(Array(17).fill({wch:12}),[{wch:24}]);
+  XLSX.utils.book_append_sheet(wb,ws,"GENERAL");XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(est),"ESTADISTICA");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fot),"DEPOSITOS");
+  const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  bajar(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"Reporte_Pastoral_"+MESES[+m-1]+"_"+y+".xlsx")};
+$("bZip").onclick=async()=>{if(!G)return;$("bZip").disabled=true;show($("mGen"),"info","Preparando las fotos, puede tardar un minuto…");
+  try{const r=await api("fotosZip",{mes:G.mes});const bin=atob(r.data);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+    bajar(new Blob([u],{type:"application/zip"}),r.nombre);show($("mGen"),"ok","Fotos de "+mesTexto(G.mes)+" descargadas.")}
+  catch(err){show($("mGen"),"bad",err.message)}
+  $("bZip").disabled=false};
+
+/* ---------- arranque ---------- */
+if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+(async()=>{const p=ls("rp_pin");if(!p)return;PIN=p;show($("mLogin"),"info","Entrando…");
+  try{S=await api("entrar");iniciar()}catch(err){PIN=null;ls("rp_pin",null);show($("mLogin"),"bad",err.message)}})();
+</script>
+</body>
+</html>
