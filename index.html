@@ -112,6 +112,16 @@ table.gen tfoot td{font-weight:800;background:var(--bg)}
 .concil .nom{font-size:.85rem;color:var(--muted);margin-top:2px}
 .concil button.ir{font:inherit;font-size:.85rem;background:none;border:none;color:var(--accent);text-decoration:underline;cursor:pointer;padding:0 2px}
 tr.resalta td{background:var(--warn-bg)!important}
+.gctl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.gctl label{min-width:200px}
+.chart{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:10px 10px 4px;position:relative}
+.chart svg{width:100%;height:auto;display:block;font-family:var(--body)}
+.chart .tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:.82rem;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap}
+.chart .tip[hidden]{display:none}
+.chart h4{margin:0 0 4px;font-family:var(--display);font-size:.95rem}
+.var{font-weight:700}.var.up{color:var(--accent)}.var.down{color:#b5560f}
+@media (prefers-color-scheme:dark){.var.down{color:#f0a060}}
+table.gen td .barra{display:inline-block;height:10px;border-radius:2px;vertical-align:middle}
 .pill{display:inline-block;font-size:.75rem;font-weight:700;border-radius:99px;padding:1px 8px}
 .pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -197,6 +207,23 @@ tr.resalta td{background:var(--warn-bg)!important}
   <h3 class="tt">Reporte estadístico</h3>
   <div class="tablewrap"><table class="gen" id="estTab"></table></div>
 </section>
+
+<!-- Gráficas (administrador) -->
+<section class="tab" id="tGraf" hidden>
+  <h2>Crecimiento y descenso</h2>
+  <p class="help">Evolución de los últimos 12 meses y comparación de cada mes con el anterior y con el mismo mes del año pasado.</p>
+  <div class="gctl">
+    <label class="f" for="gPastor">Pastor<select id="gPastor"></select></label>
+    <label class="f" for="gInd">Dato<select id="gInd"></select></label>
+    <label class="f" for="gMes">Mes a comparar<select id="gMes"></select></label>
+  </div>
+  <div class="msg" id="mGraf" hidden></div>
+  <div class="kpis" id="gKpis"></div>
+  <div class="chart" id="gChart"><h4 id="gTit"></h4><svg id="gSvg" viewBox="0 0 760 300" role="img"></svg><div class="tip" id="gTip" hidden></div></div>
+  <h3 class="tt" id="gTabTit">Crecimiento por pastor</h3>
+  <p class="help">Toque el nombre de un pastor para ver su gráfica.</p>
+  <div class="tablewrap"><table class="gen" id="gTab"></table></div>
+</section>
 </main>
 </div>
 
@@ -252,7 +279,7 @@ function abrir(id){document.querySelectorAll("section.tab").forEach(s=>s.hidden=
 function iniciar(){
   $("vLogin").hidden=true;$("vApp").hidden=false;
   if(S.admin){$("hdrNombre").textContent="Administrador";$("hdrIglesia").textContent="Sección Jutiapa";$("hdrMes").hidden=true;
-    document.body.classList.add("admin");pestanas([["tGen","Reporte general"]]);prepararAdmin();return}
+    document.body.classList.add("admin");pestanas([["tGen","Reporte general"],["tGraf","Gráficas"]]);prepararAdmin();$("nav").addEventListener("click",e=>{if(e.target.dataset&&e.target.dataset.t==="tGraf")abrirGraficas()});return}
   const p=S.pastor;$("hdrNombre").textContent=p.nombre;$("hdrIglesia").textContent="Iglesia "+p.iglesia+" · "+p.lugar;
   $("hdrMes").textContent="Reporte de "+mesTexto(S.mes);
   pestanas([["tFin","Reporte financiero y boleta"],["tEst","Reporte estadístico"]]);
@@ -570,6 +597,83 @@ async function generarFormato(c){$("bFormato").disabled=true;show($("mGen"),"inf
     show($("mGen"),c.fuera.length?"warn":"ok","Formato oficial de "+mesTexto(G.mes)+" descargado con "+c.incluidos.length+" de "+G.filas.length+" pastores."+(c.pend.length?" La hoja PENDIENTES indica quiénes faltan y por qué.":""))}
   catch(err){show($("mGen"),"bad",err.message)}
   $("bFormato").disabled=false}
+
+/* ---------- gráficas de crecimiento (administrador) ---------- */
+let HG=null;
+const MESC=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const mesCorto=k=>{const [y,m]=k.split("-");return MESC[+m-1]+" "+y.slice(2)};
+const sumaMes=(k,n)=>{let [y,m]=k.split("-").map(Number);m+=n;while(m<1){m+=12;y--}while(m>12){m-=12;y++}return y+"-"+String(m).padStart(2,"0")};
+function indicadores(){const L=[{g:"Financiero",k:"f:total",t:"Total reportado",din:1}];
+  FIN.forEach((f,i)=>L.push({g:"Financiero",k:"f:"+i,t:f.t,din:1}));
+  Object.values(EST).flat().forEach(([k,t],i)=>L.push({g:"Estadístico",k:"e:"+i,t:t==="Total"?"Total membresía":t,din:0}));return L}
+async function abrirGraficas(){if(HG)return;show($("mGraf"),"info","Cargando historial…");
+  try{HG=await api("historial");}catch(err){show($("mGraf"),"bad",err.message);return}
+  show($("mGraf"),"info","");
+  const sp=$("gPastor");sp.textContent="";const o0=document.createElement("option");o0.value="";o0.textContent="Toda la sección";sp.append(o0);
+  HG.pastores.forEach(p=>{const o=document.createElement("option");o.value=p.id;o.textContent=p.nombre;sp.append(o)});
+  const si=$("gInd");si.textContent="";const grupos={};indicadores().forEach(x=>{if(!grupos[x.g]){grupos[x.g]=document.createElement("optgroup");grupos[x.g].label=x.g;si.append(grupos[x.g])}
+    const o=document.createElement("option");o.value=x.k;o.textContent=x.t;grupos[x.g].append(o)});
+  const meses=Array.from(new Set(HG.fin.map(r=>r[0]).concat(HG.est.map(r=>r[0])))).sort().reverse();
+  const sm=$("gMes");sm.textContent="";(meses.length?meses:[HG.hasta]).forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=mesTexto(m);sm.append(o)});
+  ["gPastor","gInd","gMes"].forEach(id=>$(id).onchange=pintarGraficas);pintarGraficas()}
+function valor(ind,id,mes){ // null si no hay dato
+  const [tipo,ix]=ind.split(":"),filas=tipo==="f"?HG.fin:HG.est,col=ix==="total"?2+FIN.length:2+Number(ix);
+  const rs=filas.filter(r=>r[0]===mes&&(!id||r[1]===id));if(!rs.length)return null;
+  return r2(rs.reduce((a,r)=>a+(Number(r[col])||0),0))}
+function fmtV(v,din){return v==null?"—":din?q(v):Number(v).toLocaleString("es-GT")}
+function variacion(a,b,din){if(a==null||b==null)return null;const d=r2(a-b),p=b?d/Math.abs(b)*100:null;
+  return {d,p,txt:(d>0?"▲ ":d<0?"▼ ":"")+(din?q(Math.abs(d)):Math.abs(d).toLocaleString("es-GT"))+(p!=null&&isFinite(p)?" ("+(d>0?"+":d<0?"−":"")+Math.abs(p).toFixed(1)+" %)":""),cls:d>0?"up":d<0?"down":""}}
+function pintarGraficas(){
+  const id=$("gPastor").value,ind=$("gInd").value,mes=$("gMes").value,info=indicadores().find(x=>x.k===ind),din=info.din;
+  const nombre=id?HG.pastores.find(p=>p.id===id).nombre:"Toda la sección";
+  const v0=valor(ind,id,mes),v1=valor(ind,id,sumaMes(mes,-1)),v12=valor(ind,id,sumaMes(mes,-12));
+  const k=$("gKpis");k.textContent="";
+  [[info.t+" · "+mesTexto(mes),fmtV(v0,din),null],["Contra "+mesTexto(sumaMes(mes,-1)),null,variacion(v0,v1,din)],["Contra "+mesTexto(sumaMes(mes,-12)),null,variacion(v0,v12,din)]]
+   .forEach(([a,b,v])=>{const d=document.createElement("div");d.className="kpi";const s1=document.createElement("span");s1.textContent=a;const s2=document.createElement("b");
+     if(v){s2.textContent=v.txt||"Sin cambio";s2.className="var "+v.cls}else s2.textContent=b!=null?b:"Sin datos de ese mes";d.append(s1,s2);k.append(d)});
+  // serie de 12 meses
+  const xs=[];for(let i=11;i>=0;i--)xs.push(sumaMes(mes,-i));const ys=xs.map(m=>valor(ind,id,m));
+  $("gTit").textContent=info.t+" — "+nombre+" (últimos 12 meses)";dibujarLinea(xs,ys,din);
+  // tabla por pastor
+  $("gTabTit").textContent=info.t+": "+mesTexto(mes)+" contra "+mesTexto(sumaMes(mes,-1));
+  const filas=HG.pastores.map(p=>{const a=valor(ind,p.id,mes),b=valor(ind,p.id,sumaMes(mes,-1));return {p,a,b,v:variacion(a,b,din)}});
+  filas.sort((x,y)=>((y.v?y.v.d:-1e15)-(x.v?x.v.d:-1e15)));
+  const maxd=Math.max(1,...filas.filter(f=>f.v).map(f=>Math.abs(f.v.d)));
+  const t=$("gTab");t.textContent="";const hr=document.createElement("tr");
+  ["Pastor",mesTexto(mes),mesTexto(sumaMes(mes,-1)),"Cambio",""].forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.append(th)});
+  const th=document.createElement("thead");th.append(hr);t.append(th);const tb=document.createElement("tbody");
+  filas.forEach(f=>{const tr=document.createElement("tr");const c=(x,cls)=>{const td=document.createElement("td");if(cls)td.className=cls;if(x instanceof Node)td.append(x);else td.textContent=x;tr.append(td)};
+    const bn=document.createElement("button");bn.type="button";bn.className="ir";bn.style.cssText="font:inherit;background:none;border:none;color:var(--accent);text-decoration:underline;cursor:pointer;padding:0";bn.textContent=f.p.nombre;
+    bn.onclick=()=>{$("gPastor").value=f.p.id;pintarGraficas();$("gChart").scrollIntoView({behavior:"smooth",block:"center"})};c(bn);
+    c(fmtV(f.a,din),"num");c(fmtV(f.b,din),"num");
+    const sv=document.createElement("span");if(f.v){sv.textContent=f.v.txt||"Sin cambio";sv.className="var "+f.v.cls}else sv.textContent="—";c(sv,"num");
+    const bar=document.createElement("span");if(f.v&&f.v.d){bar.className="barra";bar.style.width=Math.max(2,Math.round(Math.abs(f.v.d)/maxd*120))+"px";bar.style.background=f.v.d>0?"var(--accent)":"#d97a2b"}c(bar);
+    tb.append(tr)});t.append(tb)}
+function dibujarLinea(xs,ys,din){
+  const svg=$("gSvg"),W=Math.max(320,Math.round(svg.getBoundingClientRect().width||760)),H=280,L=78,R=16,T=22,B=36,ns="http://www.w3.org/2000/svg";svg.textContent="";svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  const el=(n,a,txt)=>{const e=document.createElementNS(ns,n);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;svg.append(e);return e};
+  const vals=ys.filter(v=>v!=null);if(!vals.length){el("text",{x:W/2,y:H/2,"text-anchor":"middle",fill:"var(--muted)","font-size":14},"No hay datos en estos meses");return}
+  let mx=Math.max(...vals),mn=Math.min(0,...vals);if(mx===mn)mx=mn+1;
+  const paso=(()=>{const r=(mx-mn)/4,p=Math.pow(10,Math.floor(Math.log10(r))),n=r/p;return (n<=1?1:n<=2?2:n<=5?5:10)*p})();mx=Math.ceil(mx/paso)*paso;
+  const X=i=>L+(W-L-R)*(xs.length===1?0.5:i/(xs.length-1)),Y=v=>T+(H-T-B)*(1-(v-mn)/(mx-mn));
+  for(let v=mn;v<=mx+1e-9;v+=paso){el("line",{x1:L,x2:W-R,y1:Y(v),y2:Y(v),stroke:"var(--line)","stroke-width":1});
+    el("text",{x:L-8,y:Y(v)+4,"text-anchor":"end","font-size":11,fill:"var(--muted)"},din?"Q"+Math.round(v).toLocaleString("es-GT"):Math.round(v).toLocaleString("es-GT"))}
+  xs.forEach((m,i)=>el("text",{x:X(i),y:H-12,"text-anchor":"middle","font-size":11,fill:"var(--muted)"},mesCorto(m)));
+  let d="";ys.forEach((v,i)=>{if(v==null)return;d+=(d&&ys[i-1]!=null?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)});
+  el("path",{d,fill:"none",stroke:"var(--accent)","stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"});
+  const pts=[];ys.forEach((v,i)=>{if(v==null)return;pts.push(el("circle",{cx:X(i),cy:Y(v),r:4.5,fill:"var(--accent)",stroke:"var(--surface)","stroke-width":2}))});
+  const li=vals.length?ys.lastIndexOf(vals[vals.length-1]):-1;
+  const cross=el("line",{x1:0,x2:0,y1:T,y2:H-B,stroke:"var(--muted)","stroke-width":1,"stroke-dasharray":"3 3",visibility:"hidden"});
+  const tip=$("gTip"),box=$("gChart");
+  const mover=e=>{const r=svg.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width;let bi=-1,bd=1e9;
+    ys.forEach((v,i)=>{if(v==null)return;const dd=Math.abs(X(i)-x);if(dd<bd){bd=dd;bi=i}});if(bi<0)return;
+    cross.setAttribute("x1",X(bi));cross.setAttribute("x2",X(bi));cross.setAttribute("visibility","visible");
+    const prev=bi>0?ys[bi-1]:null,v=variacion(ys[bi],prev,din);tip.textContent="";const b1=document.createElement("b");b1.textContent=mesTexto(xs[bi])+": "+fmtV(ys[bi],din);tip.append(b1);
+    if(v){const s2=document.createElement("div");s2.className="var "+v.cls;s2.textContent=(v.txt||"Sin cambio")+" vs mes anterior";tip.append(s2)}
+    tip.hidden=false;const br=box.getBoundingClientRect();let lx=(X(bi)/W)*r.width+(r.left-br.left)+12;if(lx+tip.offsetWidth>br.width)lx-=tip.offsetWidth+24;
+    tip.style.left=lx+"px";tip.style.top=((Y(ys[bi])/H)*r.height+(r.top-br.top)-10)+"px"};
+  svg.onpointermove=mover;svg.onpointerdown=mover;svg.onpointerleave=()=>{tip.hidden=true;cross.setAttribute("visibility","hidden")};
+  if(li>=0)el("text",{x:Math.min(X(li),W-R-4),y:Y(ys[li])-10,"text-anchor":X(li)>W-90?"end":"middle","font-size":12,"font-weight":700,fill:"var(--ink)"},fmtV(ys[li],din))}
 
 $("bZip").onclick=async()=>{if(!G)return;$("bZip").disabled=true;show($("mGen"),"info","Preparando las fotos, puede tardar un minuto…");
   try{const r=await api("fotosZip",{mes:G.mes});const bin=atob(r.data);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
