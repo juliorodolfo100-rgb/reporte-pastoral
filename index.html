@@ -345,7 +345,7 @@ function cuadre(t){
   const d=r2(ref.monto-t);
   if(Math.abs(d)<0.005){show(m,"ok","La app leyó en tu boleta "+q(ref.monto)+". ✓ Cuadra con tu reporte financiero.");b.disabled=false;return}
   show(m,"bad","La app leyó en tu boleta "+q(ref.monto)+" y tu reporte suma "+q(t)+". Tu boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+" que tu reporte financiero: corrige el formulario. Si al ver tu boleta física la cantidad no es "+q(ref.monto)+", la app la leyó mal: toca «Volver a tomar la foto». "+AYUDA_FOTO);
-  b.disabled=true;sugerirAjuste(m,d,"fin_",S.pastor.pagaJub,"Si estás seguro de que tu boleta está bien y la diferencia está en el diezmo del pastor:")}
+  b.disabled=true;sugerirAjuste(m,d,"fin_",S.pastor.pagaJub,"Si estás seguro de que tu boleta está bien:")}
 // Calcula cuánto cambiar en «Diezmos del pastor» (y su jubilación del 20 %) para que el total quede igual a la boleta.
 function ajusteDiezmo(dif,dp,pj){
   const tot=v=>r2(v+(pj?r2(v*.2):0)),obj=r2(tot(dp)+dif),c0=Math.round((pj?obj/1.2:obj)*100);let best=null;
@@ -512,7 +512,7 @@ function calcEd(){
   const t=r2(FIN.reduce((a,x)=>a+num($("ed_"+x.k).value),0)),m=r2(num($("ed_monto").value)),b=$("ed_guardar"),d=r2(m-t);
   if(!(m>0)){show($("ed_msg"),"info","El reporte suma "+q(t)+". Escriba el monto de la boleta.");b.disabled=true}
   else if(Math.abs(d)<0.005){show($("ed_msg"),"ok","El reporte suma "+q(t)+". ✓ Cuadra con la boleta.");b.disabled=false}
-  else{show($("ed_msg"),"bad","El reporte suma "+q(t)+" y la boleta "+q(m)+": la boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+". Corrija antes de guardar.");b.disabled=true;sugerirAjuste($("ed_msg"),d,"ed_",ED.f.pastor.pagaJub!==false,"Si la boleta está bien y la diferencia está en el diezmo del pastor:")}
+  else{show($("ed_msg"),"bad","El reporte suma "+q(t)+" y la boleta "+q(m)+": la boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+". Corrija antes de guardar.");b.disabled=true;sugerirAjuste($("ed_msg"),d,"ed_",ED.f.pastor.pagaJub!==false,"Si la boleta está bien:")}
   return t}
 async function guardarEd(){
   const d={};FIN.forEach(x=>d[x.k]=num($("ed_"+x.k).value));d.misionero=$("ed_misionero").value.trim();
