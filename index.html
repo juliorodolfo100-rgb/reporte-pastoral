@@ -133,7 +133,13 @@ table.gen tfoot td{font-weight:800;background:var(--bg)}
   <p class="help">Escriba las cantidades en quetzales. La jubilación y el total se calculan solos.</p>
   <form id="fFin" autocomplete="off">
     <table class="rep"><tbody id="finBody"></tbody></table>
-    <div class="actions"><button class="btn" type="submit" id="bFin">Guardar reporte</button></div>
+    <fieldset style="margin-top:14px"><legend>Boleta de depósito</legend>
+      <p class="help">Al terminar de llenar el reporte, tome la foto de su boleta completa, derecha y con buena luz. La app lee la cantidad y la compara con su reporte.</p>
+      <div class="actions" style="margin-top:0"><span class="btn filebtn"><span id="lblFoto">Tomar foto</span><input type="file" id="inFoto" accept="image/*" capture="environment" aria-label="Tomar foto de la boleta"></span><span class="btn sec filebtn"><span>Subir desde archivo</span><input type="file" id="inArchivo" accept="image/*" aria-label="Subir foto de la boleta desde archivo o galería"></span></div>
+      <div class="photo" id="fotoBox"><div class="ph">Todavía no hay foto de la boleta.</div></div>
+      <div class="msg" id="mFoto" hidden></div>
+    </fieldset>
+    <div class="actions"><button class="btn" type="submit" id="bFin" disabled>Guardar reporte y boleta</button></div>
     <div class="msg" id="mFin" hidden></div>
   </form>
   <details class="prev" id="prevBox" hidden><summary id="prevTit"></summary><div class="body"><table id="prevTab"></table></div></details>
@@ -150,19 +156,6 @@ table.gen tfoot td{font-weight:800;background:var(--bg)}
     <div class="actions"><button class="btn" type="submit" id="bEst">Guardar reporte estadístico</button></div>
     <div class="msg" id="mEst" hidden></div>
   </form>
-</section>
-
-<!-- Foto -->
-<section class="tab" id="tFoto" hidden>
-  <h2>Foto del depósito bancario</h2>
-  <p class="help">Tome la foto de la boleta completa, derecha y con buena luz. La foto se revisa automáticamente para confirmar que se pueda leer.</p>
-  <div class="actions"><span class="btn filebtn"><span id="lblFoto">Tomar foto</span><input type="file" id="inFoto" accept="image/*" capture="environment" aria-label="Tomar foto de la boleta"></span><span class="btn sec filebtn"><span>Subir desde archivo</span><input type="file" id="inArchivo" accept="image/*" aria-label="Subir foto de la boleta desde archivo o galería"></span></div>
-  <div class="photo" id="fotoBox"><div class="ph">Todavía no hay foto para este mes.</div></div>
-  <div class="msg" id="mFoto" hidden></div>
-  <div class="actions">
-    <button class="btn" type="button" id="bGuardarFoto" disabled>Guardar foto</button>
-    <button class="btn sec" type="button" id="bOtra" hidden>Tomar de nuevo</button>
-  </div>
 </section>
 
 <!-- Administrador -->
@@ -239,7 +232,7 @@ function iniciar(){
     pestanas([["tGen","Reporte general"]]);prepararAdmin();return}
   const p=S.pastor;$("hdrNombre").textContent=p.nombre;$("hdrIglesia").textContent="Iglesia "+p.iglesia+" · "+p.lugar;
   $("hdrMes").textContent="Reporte de "+mesTexto(S.mes);
-  pestanas([["tFin","Reporte financiero"],["tEst","Reporte estadístico"],["tFoto","Foto del depósito"]]);
+  pestanas([["tFin","Reporte financiero y boleta"],["tEst","Reporte estadístico"]]);
   armarFin();armarEst();armarFoto();
 }
 
@@ -277,15 +270,20 @@ function calcFin(){
   const dp=num($("fin_diezPastor").value),di=num($("fin_diezIglesia").value);
   $("fin_jubPastor").value=pj&&dp?r2(dp*.2).toFixed(2):"";
   $("fin_jubIglesia").value=di?r2(di*.2).toFixed(2):"";
-  const t=r2(FIN.reduce((a,f)=>a+num($("fin_"+f.k).value),0));$("fin_total").value=q(t);return t}
+  const t=r2(FIN.reduce((a,f)=>a+num($("fin_"+f.k).value),0));$("fin_total").value=q(t);cuadre(t);return t}
 $("fFin").addEventListener("submit",async e=>{e.preventDefault();const t=calcFin();
   if(t<=0){show($("mFin"),"bad","Escriba al menos una cantidad antes de guardar.");return}
   if(!(num($("fin_diezPastor").value)>0)){show($("mFin"),"bad","Te falta reportar diezmos del pastor.");$("fin_diezPastor").focus();return}
+  const ref=BOL.nueva||BOL.guardada;
+  if(!ref){show($("mFin"),"bad","Falta la foto de la boleta de depósito.");return}
+  if(ref.monto!=null&&Math.abs(ref.monto-t)>=0.005){show($("mFin"),"bad","No se puede guardar: el reporte no cuadra con la boleta.");return}
   const d={};FIN.forEach(f=>d[f.k]=num($("fin_"+f.k).value));d.misionero=$("fin_misionero").value.trim();
   $("bFin").disabled=true;show($("mFin"),"info","Guardando…");
-  try{const r=await api("guardarFin",{datos:d});S.actual.fin=r.fin;permitirFoto();show($("mFin"),"ok","Reporte de "+mesTexto(r.mes)+" guardado. Total "+q(r.total)+".")}
+  try{const r=await api("guardarFin",{datos:d,tempId:BOL.nueva?BOL.nueva.tempId:null});S.actual.fin=r.fin;
+    if(r.foto){S.actual.foto=r.foto;BOL.guardada={monto:r.foto.monto};BOL.nueva=null;$("lblFoto").textContent="Cambiar foto"}
+    const [c,m]=resumen();show($("mFin"),c,m)}
   catch(err){show($("mFin"),"bad",err.message)}
-  $("bFin").disabled=false});
+  cuadre(t)});
 
 /* ---------- estadístico ---------- */
 function armarEst(){
@@ -302,22 +300,29 @@ $("fEst").addEventListener("submit",async e=>{e.preventDefault();calcEst();
   if(!S.actual.fin||!(S.actual.fin.diezPastor>0)){show($("mEst"),"bad","Te falta reportar diezmos del pastor.");return}
   const d={};Object.values(EST).flat().forEach(([k])=>d[k]=Math.round(num($("est_"+k).value)));
   $("bEst").disabled=true;show($("mEst"),"info","Guardando…");
-  try{const r=await api("guardarEst",{datos:d});S.actual.est=r.est;show($("mEst"),"ok","Reporte estadístico de "+mesTexto(r.mes)+" guardado.")}
+  try{const r=await api("guardarEst",{datos:d});S.actual.est=r.est;const [c,m]=resumen();show($("mEst"),c,m)}
   catch(err){show($("mEst"),"bad",err.message)}
   $("bEst").disabled=false});
 
-/* ---------- foto ---------- */
-let tempId=null;
-function verFoto(src){const b=$("fotoBox");b.textContent="";if(!src){const d=document.createElement("div");d.className="ph";d.textContent="Todavía no hay foto para este mes.";b.append(d);return}
+/* ---------- boleta de depósito (dentro del reporte financiero) ---------- */
+const AYUDA_FOTO="Revisa que la boleta no esté doblada ni arrugada, que esté derecha, completa y con buena luz, y vuelve a tomar la foto. Si aun así no se lee, envía tu boleta al administrador.";
+let BOL={guardada:null,nueva:null,leyendo:false};
+function verFoto(src,texto){const b=$("fotoBox");b.textContent="";if(!src){const d=document.createElement("div");d.className="ph";d.textContent=texto||"Todavía no hay foto de la boleta.";b.append(d);return}
   const i=document.createElement("img");i.src=src;i.alt="Foto de la boleta de depósito";b.append(i)}
-const AYUDA_FOTO=" Si estás seguro de que tu reporte está bien, puede que la foto no se lea correctamente: revisa que la boleta no esté doblada ni arrugada, que esté derecha, completa y con buena luz, y vuelve a tomarla. Si aun así no se acepta, envía tu boleta al administrador.";
-function permitirFoto(){const ok=!!S.actual.fin;$("inFoto").disabled=!ok;$("inArchivo").disabled=!ok;
-  if(!ok)show($("mFoto"),"warn","Primero llene y guarde su Reporte financiero. Después podrá subir la foto del depósito.");
-  else if($("mFoto").classList.contains("warn")&&!tempId)show($("mFoto"),"info","")}
-function armarFoto(){permitirFoto();const f=S.actual.foto;
-  if(f){$("lblFoto").textContent="Cambiar foto";const b=$("fotoBox");b.textContent="";const d=document.createElement("div");d.className="ph";
-    d.textContent="Foto guardada el "+f.subida+(f.monto?" · monto leído "+q(f.monto):"")+".";b.append(d);
-    show($("mFoto"),"ok","Ya envió la foto de su depósito de "+mesTexto(S.mes)+".")}}
+function armarFoto(){const f=S.actual.foto;
+  if(f){BOL.guardada={monto:f.monto};verFoto(null,"Boleta guardada el "+f.subida+(f.monto!=null?" · la app leyó "+q(f.monto):"")+".");$("lblFoto").textContent="Cambiar foto"}
+  calcFin()}
+function resumen(){const falta=[];if(!S.actual.fin)falta.push("reporte financiero");if(!S.actual.foto)falta.push("boleta del banco");if(!S.actual.est)falta.push("reporte estadístico");
+  return falta.length?["warn","Guardado con éxito. Todavía falta: "+falta.join(", ")+"."]:["ok","Tu reporte financiero, tu reporte estadístico y tu boleta del banco fueron guardados con éxito. ¡Gracias!"]}
+function cuadre(t){
+  if(BOL.leyendo)return;
+  const ref=BOL.nueva||BOL.guardada,m=$("mFoto"),b=$("bFin");
+  if(!ref){show(m,"info","Al terminar de llenar el reporte, tome la foto de su boleta de depósito.");b.disabled=true;return}
+  if(ref.monto==null){show(m,"warn","No se pudo revisar la boleta automáticamente. Confirme que el total de su reporte sea igual al de la boleta.");b.disabled=false;return}
+  const d=r2(ref.monto-t);
+  if(Math.abs(d)<0.005){show(m,"ok","La app leyó en tu boleta "+q(ref.monto)+". ✓ Cuadra con tu reporte financiero.");b.disabled=false;return}
+  show(m,"bad","La app leyó en tu boleta "+q(ref.monto)+" y tu reporte suma "+q(t)+". Tu boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+" que tu reporte financiero: corrige el formulario. Si al ver tu boleta física la cantidad no es "+q(ref.monto)+", la app la leyó mal: toca «Volver a tomar la foto». "+AYUDA_FOTO);
+  b.disabled=true}
 async function reducir(file){
   const img=await createImageBitmap(file).catch(()=>null);if(!img)throw new Error("No se pudo abrir la foto. Tómela de nuevo.");
   const max=1600,s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement("canvas");
@@ -325,28 +330,16 @@ async function reducir(file){
   return c.toDataURL("image/jpeg",0.85)}
 async function procesarFoto(e){
   const file=e.target.files&&e.target.files[0];e.target.value="";if(!file)return;
-  tempId=null;$("bGuardarFoto").disabled=true;$("bOtra").hidden=true;
+  BOL.nueva=null;BOL.leyendo=true;$("bFin").disabled=true;
   try{
-    const url=await reducir(file);verFoto(url);show($("mFoto"),"info","Revisando si la boleta se puede leer…");
+    const url=await reducir(file);verFoto(url);show($("mFoto"),"info","Leyendo la boleta…");
     const r=await api("revisarFoto",{imagen:{tipo:"image/jpeg",data:url.split(",")[1]}});
-    const a=r.analisis||{};tempId=r.tempId;$("bOtra").hidden=false;
-    if(r.descuadre){tempId=null;show($("mFoto"),"bad",r.descuadre+AYUDA_FOTO);return}
-    if(a.legible===false){tempId=null;show($("mFoto"),"bad","La foto no se puede leer bien"+(a.motivo?": "+a.motivo:"")+". Revisa que la boleta no esté doblada ni arrugada, que esté derecha, completa y con buena luz, y vuelve a tomarla.");return}
-    let t=a.legible===true?"La boleta se puede leer.":"No se pudo revisar automáticamente; confirme que se lean el monto, la fecha y el número de documento.";
-    if(a.monto) t+=" Monto: "+q(a.monto)+".";if(a.fecha) t+=" Fecha: "+a.fecha+".";
-    const tot=r.totalReporte;
-    if(tot&&a.monto&&Math.abs(tot-a.monto)>0.005){show($("mFoto"),"warn",t+" Atención: su reporte suma "+q(tot)+" y la boleta dice "+q(a.monto)+". Revise antes de guardar.")}
-    else show($("mFoto"),a.legible===true?"ok":"warn",t);
-    $("bGuardarFoto").disabled=false;
-  }catch(err){show($("mFoto"),"bad",err.message);$("bOtra").hidden=false}
+    const a=r.analisis||{};BOL.leyendo=false;$("lblFoto").textContent="Volver a tomar la foto";
+    if(a.legible===false){show($("mFoto"),"bad","La foto no se puede leer bien"+(a.motivo?": "+a.motivo:"")+". "+AYUDA_FOTO);$("bFin").disabled=true;return}
+    BOL.nueva={tempId:r.tempId,monto:a.monto!=null?Number(a.monto):null};calcFin();
+  }catch(err){BOL.leyendo=false;show($("mFoto"),"bad",err.message)}
 }
 $("inFoto").addEventListener("change",procesarFoto);$("inArchivo").addEventListener("change",procesarFoto);
-$("bOtra").onclick=()=>$("inFoto").click();
-$("bGuardarFoto").onclick=async()=>{if(!tempId)return;$("bGuardarFoto").disabled=true;show($("mFoto"),"info","Guardando foto…");
-  try{const r=await api("guardarFoto",{tempId});S.actual.foto=r.foto;tempId=null;$("bOtra").hidden=true;$("lblFoto").textContent="Cambiar foto";
-    const falta=[];if(!S.actual.fin)falta.push("reporte financiero");if(!S.actual.est)falta.push("reporte estadístico");
-    show($("mFoto"),falta.length?"warn":"ok",falta.length?"Boleta del banco guardada con éxito. Todavía falta: "+falta.join(" y ")+".":"Tu reporte financiero, tu reporte estadístico y tu boleta del banco fueron guardados con éxito. ¡Gracias!")}
-  catch(err){$("bGuardarFoto").disabled=false;show($("mFoto"),"bad",err.message)}};
 
 /* ---------- administrador ---------- */
 let G=null;
