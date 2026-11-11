@@ -67,6 +67,7 @@ legend{font-family:var(--display);font-weight:700;color:var(--accent);padding:0 
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .filebtn{position:relative;overflow:hidden}
 .filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.filebtn:has(input:disabled){opacity:.45;cursor:not-allowed}
 .msg{border-radius:10px;padding:10px 12px;margin-top:12px;font-weight:600}
 .msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--bad-bg);color:var(--bad)}.msg.warn{background:var(--warn-bg);color:var(--warn)}.msg.info{background:var(--bg);color:var(--muted)}
 .msg[hidden]{display:none}
@@ -208,9 +209,10 @@ function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null
 
 let PIN=null, S=null; // S = respuesta del servidor al entrar
 
+function dispositivo(){let d=ls("rp_dev");if(!d){d=Date.now().toString(36)+Math.random().toString(36).slice(2,10);ls("rp_dev",d)}return d||"sin-id"}
 async function api(accion,extra){
   if(!window.API_URL) throw new Error("La aplicación no está configurada (falta la dirección del servidor).");
-  const r=await fetch(window.API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({accion,pin:PIN},extra||{}))});
+  const r=await fetch(window.API_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(Object.assign({accion,pin:PIN,dev:dispositivo()},extra||{}))});
   if(!r.ok) throw new Error("El servidor no respondió. Revise su conexión.");
   const j=await r.json(); if(!j.ok) throw new Error(j.error||"Ocurrió un error.");
   return j;
@@ -280,7 +282,7 @@ $("fFin").addEventListener("submit",async e=>{e.preventDefault();const t=calcFin
   if(t<=0){show($("mFin"),"bad","Escriba al menos una cantidad antes de guardar.");return}
   const d={};FIN.forEach(f=>d[f.k]=num($("fin_"+f.k).value));d.misionero=$("fin_misionero").value.trim();
   $("bFin").disabled=true;show($("mFin"),"info","Guardando…");
-  try{const r=await api("guardarFin",{datos:d});S.actual.fin=r.fin;show($("mFin"),"ok","Reporte de "+mesTexto(r.mes)+" guardado. Total "+q(r.total)+".")}
+  try{const r=await api("guardarFin",{datos:d});S.actual.fin=r.fin;permitirFoto();show($("mFin"),"ok","Reporte de "+mesTexto(r.mes)+" guardado. Total "+q(r.total)+".")}
   catch(err){show($("mFin"),"bad",err.message)}
   $("bFin").disabled=false});
 
@@ -306,7 +308,10 @@ $("fEst").addEventListener("submit",async e=>{e.preventDefault();calcEst();
 let tempId=null;
 function verFoto(src){const b=$("fotoBox");b.textContent="";if(!src){const d=document.createElement("div");d.className="ph";d.textContent="Todavía no hay foto para este mes.";b.append(d);return}
   const i=document.createElement("img");i.src=src;i.alt="Foto de la boleta de depósito";b.append(i)}
-function armarFoto(){const f=S.actual.foto;
+function permitirFoto(){const ok=!!S.actual.fin;$("inFoto").disabled=!ok;
+  if(!ok)show($("mFoto"),"warn","Primero llene y guarde su Reporte financiero. Después podrá subir la foto del depósito.");
+  else if($("mFoto").classList.contains("warn")&&!tempId)show($("mFoto"),"info","")}
+function armarFoto(){permitirFoto();const f=S.actual.foto;
   if(f){$("lblFoto").textContent="Cambiar foto";const b=$("fotoBox");b.textContent="";const d=document.createElement("div");d.className="ph";
     d.textContent="Foto guardada el "+f.subida+(f.monto?" · monto leído "+q(f.monto):"")+".";b.append(d);
     show($("mFoto"),"ok","Ya envió la foto de su depósito de "+mesTexto(S.mes)+".")}}
