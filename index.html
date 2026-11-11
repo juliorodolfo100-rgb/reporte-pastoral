@@ -280,6 +280,7 @@ function calcFin(){
   const t=r2(FIN.reduce((a,f)=>a+num($("fin_"+f.k).value),0));$("fin_total").value=q(t);return t}
 $("fFin").addEventListener("submit",async e=>{e.preventDefault();const t=calcFin();
   if(t<=0){show($("mFin"),"bad","Escriba al menos una cantidad antes de guardar.");return}
+  if(!(num($("fin_diezPastor").value)>0)){show($("mFin"),"bad","Te falta reportar diezmos del pastor.");$("fin_diezPastor").focus();return}
   const d={};FIN.forEach(f=>d[f.k]=num($("fin_"+f.k).value));d.misionero=$("fin_misionero").value.trim();
   $("bFin").disabled=true;show($("mFin"),"info","Guardando…");
   try{const r=await api("guardarFin",{datos:d});S.actual.fin=r.fin;permitirFoto();show($("mFin"),"ok","Reporte de "+mesTexto(r.mes)+" guardado. Total "+q(r.total)+".")}
@@ -298,6 +299,7 @@ function armarEst(){
 }
 function calcEst(){$("est_totalMem").value=["propiedad","catecumenos","ninos","otros"].reduce((a,k)=>a+Math.round(num($("est_"+k).value)),0)}
 $("fEst").addEventListener("submit",async e=>{e.preventDefault();calcEst();
+  if(!S.actual.fin||!(S.actual.fin.diezPastor>0)){show($("mEst"),"bad","Te falta reportar diezmos del pastor.");return}
   const d={};Object.values(EST).flat().forEach(([k])=>d[k]=Math.round(num($("est_"+k).value)));
   $("bEst").disabled=true;show($("mEst"),"info","Guardando…");
   try{const r=await api("guardarEst",{datos:d});S.actual.est=r.est;show($("mEst"),"ok","Reporte estadístico de "+mesTexto(r.mes)+" guardado.")}
@@ -327,6 +329,7 @@ $("inFoto").addEventListener("change",async e=>{
     const url=await reducir(file);verFoto(url);show($("mFoto"),"info","Revisando si la boleta se puede leer…");
     const r=await api("revisarFoto",{imagen:{tipo:"image/jpeg",data:url.split(",")[1]}});
     const a=r.analisis||{};tempId=r.tempId;$("bOtra").hidden=false;
+    if(r.descuadre){tempId=null;show($("mFoto"),"bad",r.descuadre);return}
     if(a.legible===false){tempId=null;show($("mFoto"),"bad","La foto no es legible"+(a.motivo?": "+a.motivo:"")+". Vuelva a tomarla.");return}
     let t=a.legible===true?"La boleta se puede leer.":"No se pudo revisar automáticamente; confirme que se lean el monto, la fecha y el número de documento.";
     if(a.monto) t+=" Monto: "+q(a.monto)+".";if(a.fecha) t+=" Fecha: "+a.fecha+".";
@@ -339,7 +342,8 @@ $("inFoto").addEventListener("change",async e=>{
 $("bOtra").onclick=()=>$("inFoto").click();
 $("bGuardarFoto").onclick=async()=>{if(!tempId)return;$("bGuardarFoto").disabled=true;show($("mFoto"),"info","Guardando foto…");
   try{const r=await api("guardarFoto",{tempId});S.actual.foto=r.foto;tempId=null;$("bOtra").hidden=true;$("lblFoto").textContent="Cambiar foto";
-    show($("mFoto"),"ok","Foto del depósito guardada. ¡Gracias!")}
+    const falta=[];if(!S.actual.fin)falta.push("reporte financiero");if(!S.actual.est)falta.push("reporte estadístico");
+    show($("mFoto"),falta.length?"warn":"ok",falta.length?"Boleta del banco guardada con éxito. Todavía falta: "+falta.join(" y ")+".":"Tu reporte financiero, tu reporte estadístico y tu boleta del banco fueron guardados con éxito. ¡Gracias!")}
   catch(err){$("bGuardarFoto").disabled=false;show($("mFoto"),"bad",err.message)}};
 
 /* ---------- administrador ---------- */
