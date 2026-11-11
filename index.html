@@ -89,7 +89,15 @@ legend{font-family:var(--display);font-weight:700;color:var(--accent);padding:0 
 .kpi{border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:140px;flex:1}
 .kpi span{display:block;font-size:.78rem;color:var(--muted);font-weight:700}
 .kpi b{font-family:var(--display);font-size:1.2rem;font-variant-numeric:tabular-nums}
-.tablewrap{overflow-x:auto;margin-top:12px}
+.tablewrap{overflow:auto;margin-top:8px;max-height:75vh;border:1px solid var(--line);border-radius:8px}
+body.admin main{max-width:none}
+h3.tt{font-family:var(--display);font-size:1rem;margin:18px 0 0;color:var(--accent)}
+table.gen thead th{position:sticky;top:0;z-index:2;white-space:normal;vertical-align:bottom;min-width:58px;max-width:96px;line-height:1.15}
+body.admin table.gen{font-size:.8rem}
+table.gen th:nth-child(2){min-width:180px;max-width:none}
+table.gen td:nth-child(2),table.gen th:nth-child(2){position:sticky;left:0;z-index:1;background:var(--surface)}
+table.gen thead th:nth-child(2){z-index:3;background:var(--bg)}
+table.gen tfoot td:nth-child(2){background:var(--bg)}
 table.gen{border-collapse:collapse;font-size:.84rem;font-variant-numeric:tabular-nums;min-width:100%}
 table.gen th,table.gen td{border:1px solid var(--line);padding:4px 6px;white-space:nowrap}
 table.gen th{background:var(--bg);text-align:left}
@@ -172,7 +180,10 @@ table.gen tfoot td{font-weight:800;background:var(--bg)}
   </div>
   <div class="kpis" id="kpis"></div>
   <div class="msg" id="mGen" hidden></div>
+  <h3 class="tt">Reporte financiero</h3>
   <div class="tablewrap"><table class="gen" id="genTab"></table></div>
+  <h3 class="tt">Reporte estadístico</h3>
+  <div class="tablewrap"><table class="gen" id="estTab"></table></div>
 </section>
 </main>
 </div>
@@ -229,7 +240,7 @@ function abrir(id){document.querySelectorAll("section.tab").forEach(s=>s.hidden=
 function iniciar(){
   $("vLogin").hidden=true;$("vApp").hidden=false;
   if(S.admin){$("hdrNombre").textContent="Administrador";$("hdrIglesia").textContent="Sección Jutiapa";$("hdrMes").hidden=true;
-    pestanas([["tGen","Reporte general"]]);prepararAdmin();return}
+    document.body.classList.add("admin");pestanas([["tGen","Reporte general"]]);prepararAdmin();return}
   const p=S.pastor;$("hdrNombre").textContent=p.nombre;$("hdrIglesia").textContent="Iglesia "+p.iglesia+" · "+p.lugar;
   $("hdrMes").textContent="Reporte de "+mesTexto(S.mes);
   pestanas([["tFin","Reporte financiero y boleta"],["tEst","Reporte estadístico"]]);
@@ -376,7 +387,20 @@ function pintarGen(){
   const k=$("kpis");k.textContent="";
   [["Total reportado",q(total)],["Pastores con reporte",G.filas.filter(f=>f.fin).length+" de "+G.filas.length],["Fotos de depósito",fotos+" de "+G.filas.length],["Suma leída en boletas",q(dep)]]
    .forEach(([a,b])=>{const d=document.createElement("div");d.className="kpi";const s=document.createElement("span");s.textContent=a;const v=document.createElement("b");v.textContent=b;d.append(s,v);k.append(d)});
+  pintarEst();
 }
+function pintarEst(){
+  const t=$("estTab");t.textContent="";const cols=Object.values(EST).flat();const sum={};
+  const hr=document.createElement("tr");["No.","Pastor"].concat(cols.map(c=>c[1])).forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.append(th)});
+  const th=document.createElement("thead");th.append(hr);t.append(th);const tb=document.createElement("tbody");
+  G.filas.forEach((f,i)=>{const tr=document.createElement("tr");if(!f.est)tr.className="falta";
+    const td=(v,cls)=>{const c=document.createElement("td");if(cls)c.className=cls;c.textContent=v;tr.append(c)};
+    td(i+1);td(f.pastor.nombre);
+    cols.forEach(([k])=>{const v=f.est?f.est[k]:null;if(v)sum[k]=(sum[k]||0)+v;td(f.est?String(v||0):"",'num')});
+    if(!f.est)tr.children[2].textContent="sin reporte";tb.append(tr)});
+  t.append(tb);const tf=document.createElement("tfoot");const fr=document.createElement("tr");
+  const fc=v=>{const c=document.createElement("td");c.className="num";c.textContent=v;fr.append(c)};
+  fc("");fc("Total");cols.forEach(([k])=>fc(String(sum[k]||0)));tf.append(fr);t.append(tf)}
 function bajar(blob,nombre){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nombre;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)}
 $("bExcel").onclick=()=>{
   if(!G||!window.XLSX){show($("mGen"),"bad","No se pudo preparar el Excel. Revise su conexión y vuelva a intentar.");return}
