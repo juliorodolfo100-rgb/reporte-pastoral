@@ -185,8 +185,11 @@ tr.resalta td{background:var(--warn-bg)!important}
   <div class="actions">
     <button class="btn" type="button" id="bExcel" disabled>Descargar Excel</button>
     <button class="btn" type="button" id="bZip" disabled>Descargar fotos</button>
+    <button class="btn" type="button" id="bFormato" disabled>Descargar formato oficial</button>
   </div>
   <div class="kpis" id="kpis"></div>
+  <div class="concil" id="aviso" hidden></div>
+  <div class="concil" id="editor" hidden></div>
   <div class="concil" id="concil" hidden></div>
   <div class="msg" id="mGen" hidden></div>
   <h3 class="tt">Reporte financiero</h3>
@@ -370,14 +373,14 @@ function prepararAdmin(){
 $("bCargar").onclick=cargarGen;$("selMesGen").onchange=cargarGen;
 async function cargarGen(){
   const mes=$("selMesGen").value;$("bExcel").disabled=true;$("bZip").disabled=true;show($("mGen"),"info","Consultando "+mesTexto(mes)+"…");
-  try{G=await api("general",{mes});pintarGen();$("bExcel").disabled=false;$("bZip").disabled=!G.filas.some(f=>f.foto);
+  try{G=await api("general",{mes});pintarGen();$("bExcel").disabled=false;$("bFormato").disabled=false;$("bZip").disabled=!G.filas.some(f=>f.foto);
     const n=G.filas.filter(f=>f.fin).length,tot=G.filas.length;
     const faltan=G.filas.filter(f=>!f.fin).map(f=>f.pastor.nombre);
     show($("mGen"),n===tot?"ok":"warn",n===tot?"Ya reportaron los "+n+" pastores.":"Han reportado "+n+" de "+tot+". Faltan: "+faltan.join(", ")+".")}
   catch(err){show($("mGen"),"bad",err.message)}}
 function pintarGen(){
   const t=$("genTab");t.textContent="";let total=0,fotos=0,dep=0;const sum={};
-  const hr=document.createElement("tr");["No.","Pastor"].concat(FIN.map(f=>f.t),["Total","Misionero","Estadística","Foto","Monto boleta"]).forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.append(th)});
+  const hr=document.createElement("tr");["No.","Pastor"].concat(FIN.map(f=>f.t),["Total","Misionero","Estadística","Foto","Monto boleta","Corregir"]).forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.append(th)});
   const th=document.createElement("thead");th.append(hr);t.append(th);const tb=document.createElement("tbody");
   G.filas.forEach((f,i)=>{const tr=document.createElement("tr");tr.id="fila-"+i;if(!f.fin)tr.className="falta";
     const td=(v,cls)=>{const c=document.createElement("td");if(cls)c.className=cls;if(v instanceof Node)c.append(v);else c.textContent=v;tr.append(c)};
@@ -386,13 +389,15 @@ function pintarGen(){
     if(f.fin)total=r2(total+f.fin.total);td(f.fin?q(f.fin.total):"sin reporte","num");td(f.fin&&f.fin.misionero||"");
     const pe=document.createElement("span");pe.className="pill "+(f.est?"ok":"bad");pe.textContent=f.est?"Sí":"Falta";td(pe);
     if(f.foto){fotos++;if(f.foto.monto)dep=r2(dep+f.foto.monto);const a=document.createElement("a");a.href=f.foto.enlace;a.target="_blank";a.rel="noopener";
-      a.textContent=f.foto.legible==="SI"?"Ver":"Ver (sin verificar)";td(a)}else{const s=document.createElement("span");s.className="pill bad";s.textContent="Falta";td(s)}
+      a.textContent=f.foto.legible==="SI"?"Ver":f.foto.legible==="ADMIN"?"Ver (verificada por usted)":"Ver (sin verificar)";
+      if(f.foto.enlace)td(a);else{const s=document.createElement("span");s.className="pill ok";s.textContent="Verificada por usted";td(s)}}else{const s=document.createElement("span");s.className="pill bad";s.textContent="Falta";td(s)}
     const dif=f.fin&&f.foto&&f.foto.monto!=null&&Math.abs(f.fin.total-f.foto.monto)>0.005;
     if(dif){const s=document.createElement("span");s.className="pill warn";s.textContent=q(f.foto.monto)+" ≠ reporte";td(s,"num")}else td(f.foto&&f.foto.monto?q(f.foto.monto):"","num");
+    const bc=document.createElement("button");bc.type="button";bc.className="btn sec";bc.style.padding="3px 10px";bc.textContent="Corregir";bc.onclick=()=>abrirEditor(i);td(bc);
     tb.append(tr)});
   t.append(tb);const tf=document.createElement("tfoot");const fr=document.createElement("tr");
   const fc=v=>{const c=document.createElement("td");c.className="num";c.textContent=v;fr.append(c)};
-  fc("");fc("Total");FIN.forEach(x=>fc(sum[x.k]?sum[x.k].toFixed(2):""));fc(q(total));fc("");fc("");fc("");fc(dep?q(dep):"");tf.append(fr);t.append(tf);
+  fc("");fc("Total");FIN.forEach(x=>fc(sum[x.k]?sum[x.k].toFixed(2):""));fc(q(total));fc("");fc("");fc("");fc(dep?q(dep):"");fc("");tf.append(fr);t.append(tf);
   const k=$("kpis");k.textContent="";
   [["Total reportado",q(total)],["Pastores con reporte",G.filas.filter(f=>f.fin).length+" de "+G.filas.length],["Fotos de depósito",fotos+" de "+G.filas.length],["Suma leída en boletas",q(dep)]]
    .forEach(([a,b])=>{const d=document.createElement("div");d.className="kpi";const s=document.createElement("span");s.textContent=a;const v=document.createElement("b");v.textContent=b;d.append(s,v);k.append(d)});
@@ -416,7 +421,7 @@ function pintarConcil(){
   const c=conciliacion(),box=$("concil");box.textContent="";box.hidden=false;
   const lin=(a,b,strong)=>{const d=document.createElement("div");d.className="lin";const s1=document.createElement("span");s1.textContent=a;const s2=document.createElement("b");s2.textContent=b;if(strong)s1.style.fontWeight="800";d.append(s1,s2);return d};
   const h=document.createElement("h4");h.textContent="Conciliación: reporte contra boletas";box.append(h);
-  box.append(lin("Total reportado",q(c.rep)),lin("Suma leída en boletas",q(c.bol)),lin("Diferencia",q(c.dif),true));
+  box.append(lin("Total reportado",q(c.rep)),lin("Suma leída en boletas",q(c.bol)),lin("Diferencia",(c.dif<0?"−":"")+q(Math.abs(c.dif)),true));
   if(Math.abs(c.dif)<0.005&&c.cats.every(k=>!k.items.length)){const p=document.createElement("div");p.className="cat";p.textContent="✓ Todo cuadra: cada reporte tiene su boleta y coinciden.";box.append(p);return}
   const t=document.createElement("div");t.className="cat";t.style.fontWeight="700";t.textContent="¿De dónde sale la diferencia?";box.append(t);
   c.cats.forEach(k=>{if(!k.items.length)return;const d=document.createElement("div");d.className="cat";
@@ -461,6 +466,93 @@ $("bExcel").onclick=()=>{
   const wc=XLSX.utils.aoa_to_sheet(con);wc["!cols"]=[{wch:40},{wch:55},{wch:14}];XLSX.utils.book_append_sheet(wb,wc,"CONCILIACION");
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   bajar(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"Reporte_Pastoral_"+MESES[+m-1]+"_"+y+".xlsx")};
+/* ---------- corrección por el administrador ---------- */
+let ED=null;
+function abrirEditor(i){
+  const f=G.filas[i];ED={f,img:null};const box=$("editor");box.textContent="";box.hidden=false;
+  const h=document.createElement("h4");h.textContent="Corregir reporte de "+f.pastor.nombre+" · "+mesTexto(G.mes);box.append(h);
+  const p=document.createElement("p");p.className="help";p.textContent="Complete o corrija el reporte financiero y escriba el monto de la boleta que usted verificó. Solo se guarda si el total cuadra con la boleta.";box.append(p);
+  const g=document.createElement("div");g.className="grid2";
+  const campo=(id,t,v,ro)=>{const l=document.createElement("label");l.className="f";l.textContent=t;const x=document.createElement("input");x.id=id;if(id!=="ed_misionero"){x.inputMode="decimal";x.placeholder="0.00"}
+    if(ro){x.readOnly=true;x.tabIndex=-1}if(v!=null&&v!=="")x.value=v;l.append(x);g.append(l)};
+  FIN.forEach(x=>{const v=f.fin?f.fin[x.k]:(x.def||0);campo("ed_"+x.k,x.t+(x.auto?" (automático)":""),v?Number(v).toFixed(2):"",!!x.auto)});
+  campo("ed_misionero","Nombre del misionero",(f.fin&&f.fin.misionero)||f.pastor.misionero||"");
+  campo("ed_monto","Monto de la boleta (verificado por usted)",f.foto&&f.foto.monto!=null?Number(f.foto.monto).toFixed(2):"");
+  box.append(g);
+  const ac=document.createElement("div");ac.className="actions";
+  const sp=document.createElement("span");sp.className="btn sec filebtn";const st=document.createElement("span");st.textContent="Subir foto de la boleta (opcional)";
+  const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.setAttribute("aria-label","Subir foto de la boleta");sp.append(st,inp);
+  const bg=document.createElement("button");bg.type="button";bg.className="btn";bg.id="ed_guardar";bg.textContent="Guardar corrección";
+  const bx=document.createElement("button");bx.type="button";bx.className="btn sec";bx.textContent="Cancelar";bx.onclick=()=>{box.hidden=true;ED=null};
+  ac.append(sp,bg,bx);box.append(ac);
+  const m=document.createElement("div");m.className="msg";m.id="ed_msg";m.hidden=true;box.append(m);
+  inp.onchange=async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;try{ED.img=await reducir(file);st.textContent="Foto lista ✓ (cambiar)"}catch(err){show($("ed_msg"),"bad",err.message)}};
+  g.addEventListener("input",calcEd);bg.onclick=guardarEd;calcEd();box.scrollIntoView({block:"start",behavior:"smooth"})}
+function calcEd(){
+  const pj=ED.f.pastor.pagaJub!==false,dp=num($("ed_diezPastor").value),di=num($("ed_diezIglesia").value);
+  $("ed_jubPastor").value=pj&&dp?r2(dp*.2).toFixed(2):"";$("ed_jubIglesia").value=di?r2(di*.2).toFixed(2):"";
+  const t=r2(FIN.reduce((a,x)=>a+num($("ed_"+x.k).value),0)),m=r2(num($("ed_monto").value)),b=$("ed_guardar"),d=r2(m-t);
+  if(!(m>0)){show($("ed_msg"),"info","El reporte suma "+q(t)+". Escriba el monto de la boleta.");b.disabled=true}
+  else if(Math.abs(d)<0.005){show($("ed_msg"),"ok","El reporte suma "+q(t)+". ✓ Cuadra con la boleta.");b.disabled=false}
+  else{show($("ed_msg"),"bad","El reporte suma "+q(t)+" y la boleta "+q(m)+": la boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+". Corrija antes de guardar.");b.disabled=true}
+  return t}
+async function guardarEd(){
+  const d={};FIN.forEach(x=>d[x.k]=num($("ed_"+x.k).value));d.misionero=$("ed_misionero").value.trim();
+  const b=$("ed_guardar");b.disabled=true;show($("ed_msg"),"info","Guardando…");const nombre=ED.f.pastor.nombre;
+  try{G=await api("adminCorregir",{id:ED.f.pastor.id,mes:G.mes,datos:d,monto:num($("ed_monto").value),imagen:ED.img?{tipo:"image/jpeg",data:ED.img.split(",")[1]}:null});
+    $("editor").hidden=true;ED=null;pintarGen();show($("mGen"),"ok","Reporte de "+nombre+" corregido. Ya cuadra y entra en el formato oficial.")}
+  catch(err){show($("ed_msg"),"bad",err.message);b.disabled=false}}
+
+/* ---------- formato oficial ---------- */
+// Llena la plantilla oficial. filas: [{pastor:{id}, fin, est}] solo de pastores incluidos.
+function llenarFormato(wb, incluidos, mesNombre, anio, pendientes){
+  const RUB=['diezIglesia','diezPastor','jubPastor','jubIglesia','evangelismo','cmf','fdv','embajadores','escDominical','misioneritas','exploradores','proviudas','africa','diezMisiones','ofrenda','banco'];
+  const MEM=['propiedad','catecumenos','ninos','otros','totalMem','evangelizados','aceptados','reconciliados','discipulados','bautAgua','promEscDom','bautEspiritu','camposBlancos','obreros'];
+  const DEP=['depCMF','depFDV','depEmb','depMis','depExp'];
+  const g=wb.getWorksheet('GENERAL'), cf=wb.getWorksheet('CARTON FINANZAS'), ce=wb.getWorksheet('CARTON ESTADISTICA');
+  g.getCell('X2').value=mesNombre; g.getCell('Y2').value=anio;
+  incluidos.forEach(f=>{
+    const n=parseInt(String(f.pastor.id).replace(/\D/g,''),10); if(!(n>=1&&n<=43))return;
+    if(f.fin){RUB.forEach((k,j)=>{const v=Number(f.fin[k])||0;g.getRow(n+1).getCell(5+j).value=v?v:null});
+      g.getRow(n+1).getCell(22).value=f.fin.misionero||null}
+    if(f.est){MEM.forEach((k,j)=>{const v=Number(f.est[k])||0;cf.getRow(n+8).getCell(5+j).value=v?v:null});
+      DEP.forEach((k,j)=>{const v=Number(f.est[k])||0;ce.getRow(n+1).getCell(5+j).value=v?v:null})}
+  });
+  if(pendientes&&pendientes.length){const p=wb.addWorksheet('PENDIENTES');p.columns=[{header:'NO.',width:6},{header:'PASTOR',width:34},{header:'RAZÓN POR LA QUE NO SE INCLUYÓ',width:70}];
+    p.getRow(1).font={bold:true};pendientes.forEach(x=>p.addRow([x.no,x.nombre,x.razon]))}
+  wb.calcProperties.fullCalcOnLoad=true;
+}
+function cargarScript(src){return new Promise((ok,no)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=()=>no(new Error("No se pudo cargar la herramienta de Excel. Revise su conexión."));document.head.append(s)})}
+function clasificar(){const incluidos=[],pend=[];
+  G.filas.forEach((f,i)=>{const fin=f.fin,fo=f.foto,m=fo&&fo.monto!=null?Number(fo.monto):null;let r="";
+    if(!fin&&!fo)r="No entregó reporte financiero ni boleta";
+    else if(!fin)r="Subió boleta"+(m!=null?" ("+q(m)+")":"")+" pero no reporte financiero";
+    else if(!fo)r="Tiene reporte ("+q(fin.total)+") pero no boleta";
+    else if(m==null)r="Boleta sin monto verificado (reporte "+q(fin.total)+")";
+    else if(Math.abs(fin.total-m)>=0.005)r="No cuadra: reporte "+q(fin.total)+", boleta "+q(m);
+    if(r)pend.push({no:i+1,nombre:f.pastor.nombre,razon:r});
+    else{incluidos.push(f);if(!f.est)pend.push({no:i+1,nombre:f.pastor.nombre,razon:"Incluido, pero falta su reporte estadístico"})}});
+  return {incluidos,pend,fuera:pend.filter(x=>!x.razon.startsWith("Incluido"))}}
+$("bFormato").onclick=()=>{if(!G)return;const c=clasificar(),a=$("aviso");
+  if(!c.fuera.length){a.hidden=true;generarFormato(c);return}
+  a.textContent="";a.hidden=false;const h=document.createElement("h4");h.textContent="Antes de descargar";
+  const p=document.createElement("p");p.textContent="El formato saldrá con "+c.incluidos.length+" de "+G.filas.length+" pastores. Quedan fuera "+c.fuera.length+":";
+  const ul=document.createElement("ul");c.fuera.forEach(x=>{const li=document.createElement("li");li.textContent=x.nombre+" — "+x.razon;ul.append(li)});
+  const p2=document.createElement("p");p2.className="help";p2.textContent="Puede corregirlos con el botón «Corregir» de su fila, o descargar así y agregarlos después.";
+  const ac=document.createElement("div");ac.className="actions";
+  const b1=document.createElement("button");b1.type="button";b1.className="btn";b1.textContent="Descargar así";b1.onclick=()=>{a.hidden=true;generarFormato(c)};
+  const b2=document.createElement("button");b2.type="button";b2.className="btn sec";b2.textContent="Cancelar";b2.onclick=()=>{a.hidden=true};
+  ac.append(b1,b2);a.append(h,p,ul,p2,ac);a.scrollIntoView({block:"center",behavior:"smooth"})};
+async function generarFormato(c){$("bFormato").disabled=true;show($("mGen"),"info","Preparando el formato oficial…");
+  try{if(!window.ExcelJS)await cargarScript("https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js");
+    const r=await fetch("formato.xlsx?v="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("No se encontró la plantilla del formato.");
+    const wb=new ExcelJS.Workbook();await wb.xlsx.load(await r.arrayBuffer());
+    const [y,m]=G.mes.split("-");const mn=MESES[+m-1].toUpperCase();llenarFormato(wb,c.incluidos,mn,+y,c.pend);
+    const out=await wb.xlsx.writeBuffer();bajar(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"FORMATO_"+mn+"_"+y.slice(2)+".xlsx");
+    show($("mGen"),c.fuera.length?"warn":"ok","Formato oficial de "+mesTexto(G.mes)+" descargado con "+c.incluidos.length+" de "+G.filas.length+" pastores."+(c.pend.length?" La hoja PENDIENTES indica quiénes faltan y por qué.":""))}
+  catch(err){show($("mGen"),"bad",err.message)}
+  $("bFormato").disabled=false}
+
 $("bZip").onclick=async()=>{if(!G)return;$("bZip").disabled=true;show($("mGen"),"info","Preparando las fotos, puede tardar un minuto…");
   try{const r=await api("fotosZip",{mes:G.mes});const bin=atob(r.data);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
     bajar(new Blob([u],{type:"application/zip"}),r.nombre);show($("mGen"),"ok","Fotos de "+mesTexto(G.mes)+" descargadas.")}
