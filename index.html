@@ -104,6 +104,14 @@ table.gen th{background:var(--bg);text-align:left}
 table.gen td.num{text-align:right}
 table.gen tr.falta td{color:var(--muted);font-style:italic}
 table.gen tfoot td{font-weight:800;background:var(--bg)}
+.concil{margin-top:12px;border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:10px 14px;font-variant-numeric:tabular-nums}
+.concil h4{margin:0 0 6px;font-family:var(--display);color:var(--accent)}
+.concil .lin{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+.concil .lin b{white-space:nowrap}
+.concil .cat{margin-top:8px;padding-top:6px;border-top:1px dashed var(--line)}
+.concil .nom{font-size:.85rem;color:var(--muted);margin-top:2px}
+.concil button.ir{font:inherit;font-size:.85rem;background:none;border:none;color:var(--accent);text-decoration:underline;cursor:pointer;padding:0 2px}
+tr.resalta td{background:var(--warn-bg)!important}
 .pill{display:inline-block;font-size:.75rem;font-weight:700;border-radius:99px;padding:1px 8px}
 .pill.ok{background:var(--ok-bg);color:var(--ok)}.pill.bad{background:var(--bad-bg);color:var(--bad)}.pill.warn{background:var(--warn-bg);color:var(--warn)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -179,6 +187,7 @@ table.gen tfoot td{font-weight:800;background:var(--bg)}
     <button class="btn" type="button" id="bZip" disabled>Descargar fotos</button>
   </div>
   <div class="kpis" id="kpis"></div>
+  <div class="concil" id="concil" hidden></div>
   <div class="msg" id="mGen" hidden></div>
   <h3 class="tt">Reporte financiero</h3>
   <div class="tablewrap"><table class="gen" id="genTab"></table></div>
@@ -370,7 +379,7 @@ function pintarGen(){
   const t=$("genTab");t.textContent="";let total=0,fotos=0,dep=0;const sum={};
   const hr=document.createElement("tr");["No.","Pastor"].concat(FIN.map(f=>f.t),["Total","Misionero","Estadística","Foto","Monto boleta"]).forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.append(th)});
   const th=document.createElement("thead");th.append(hr);t.append(th);const tb=document.createElement("tbody");
-  G.filas.forEach((f,i)=>{const tr=document.createElement("tr");if(!f.fin)tr.className="falta";
+  G.filas.forEach((f,i)=>{const tr=document.createElement("tr");tr.id="fila-"+i;if(!f.fin)tr.className="falta";
     const td=(v,cls)=>{const c=document.createElement("td");if(cls)c.className=cls;if(v instanceof Node)c.append(v);else c.textContent=v;tr.append(c)};
     td(i+1);td(f.pastor.nombre);
     FIN.forEach(x=>{const v=f.fin?f.fin[x.k]:0;sum[x.k]=r2((sum[x.k]||0)+(v||0));td(v?Number(v).toFixed(2):"","num")});
@@ -387,8 +396,36 @@ function pintarGen(){
   const k=$("kpis");k.textContent="";
   [["Total reportado",q(total)],["Pastores con reporte",G.filas.filter(f=>f.fin).length+" de "+G.filas.length],["Fotos de depósito",fotos+" de "+G.filas.length],["Suma leída en boletas",q(dep)]]
    .forEach(([a,b])=>{const d=document.createElement("div");d.className="kpi";const s=document.createElement("span");s.textContent=a;const v=document.createElement("b");v.textContent=b;d.append(s,v);k.append(d)});
-  pintarEst();
+  pintarEst();pintarConcil();
 }
+function conciliacion(){
+  const c={rep:0,bol:0,cats:[
+    {t:"Pastores con reporte pero sin boleta",signo:1,items:[]},
+    {t:"Boletas sin reporte financiero",signo:-1,items:[]},
+    {t:"Boletas que no cuadran con su reporte",signo:1,items:[]},
+    {t:"Boletas sin monto leído (sin verificar)",signo:1,items:[]}]};
+  G.filas.forEach((f,i)=>{const fin=f.fin,fo=f.foto,m=fo&&fo.monto!=null?Number(fo.monto):null,n=f.pastor.nombre;
+    if(fin)c.rep=r2(c.rep+fin.total);if(m!=null)c.bol=r2(c.bol+m);
+    if(fin&&!fo)c.cats[0].items.push({i,n,v:fin.total,d:"reporte "+q(fin.total)});
+    else if(!fin&&m!=null)c.cats[1].items.push({i,n,v:-m,d:"boleta "+q(m)});
+    else if(fin&&m!=null&&Math.abs(fin.total-m)>=0.005)c.cats[2].items.push({i,n,v:r2(fin.total-m),d:"reporte "+q(fin.total)+", boleta "+q(m)});
+    else if(fin&&fo&&m==null)c.cats[3].items.push({i,n,v:fin.total,d:"reporte "+q(fin.total)})});
+  c.dif=r2(c.rep-c.bol);c.cats.forEach(k=>k.monto=r2(k.items.reduce((a,x)=>a+x.v,0)));return c}
+function irFila(i){const tr=$("fila-"+i);if(!tr)return;tr.scrollIntoView({block:"center",behavior:"smooth"});tr.classList.add("resalta");setTimeout(()=>tr.classList.remove("resalta"),2500)}
+function pintarConcil(){
+  const c=conciliacion(),box=$("concil");box.textContent="";box.hidden=false;
+  const lin=(a,b,strong)=>{const d=document.createElement("div");d.className="lin";const s1=document.createElement("span");s1.textContent=a;const s2=document.createElement("b");s2.textContent=b;if(strong)s1.style.fontWeight="800";d.append(s1,s2);return d};
+  const h=document.createElement("h4");h.textContent="Conciliación: reporte contra boletas";box.append(h);
+  box.append(lin("Total reportado",q(c.rep)),lin("Suma leída en boletas",q(c.bol)),lin("Diferencia",q(c.dif),true));
+  if(Math.abs(c.dif)<0.005&&c.cats.every(k=>!k.items.length)){const p=document.createElement("div");p.className="cat";p.textContent="✓ Todo cuadra: cada reporte tiene su boleta y coinciden.";box.append(p);return}
+  const t=document.createElement("div");t.className="cat";t.style.fontWeight="700";t.textContent="¿De dónde sale la diferencia?";box.append(t);
+  c.cats.forEach(k=>{if(!k.items.length)return;const d=document.createElement("div");d.className="cat";
+    d.append(lin("• "+k.t+" ("+k.items.length+")",(k.monto<0?"−":"")+q(Math.abs(k.monto))));
+    const nm=document.createElement("div");nm.className="nom";
+    k.items.forEach((x,j)=>{const b=document.createElement("button");b.type="button";b.className="ir";b.textContent=x.n;b.title=x.d;b.onclick=()=>irFila(x.i);
+      nm.append(b,document.createTextNode(" ("+x.d+")"+(j<k.items.length-1?"; ":"")))});d.append(nm);box.append(d)});
+  const tot=r2(c.cats.reduce((a,k)=>a+k.monto,0));const d=document.createElement("div");d.className="cat";
+  d.append(lin("Suma de las razones",(tot<0?"−":"")+q(Math.abs(tot))+(Math.abs(tot-c.dif)<0.005?" ✓":""),true));box.append(d)}
 function pintarEst(){
   const t=$("estTab");t.textContent="";const cols=Object.values(EST).flat();const sum={};
   const hr=document.createElement("tr");["No.","Pastor"].concat(cols.map(c=>c[1])).forEach(h=>{const th=document.createElement("th");th.textContent=h;hr.append(th)});
@@ -419,6 +456,9 @@ $("bExcel").onclick=()=>{
   ws["!cols"]=[{wch:5},{wch:30},{wch:20},{wch:24}].concat(Array(17).fill({wch:12}),[{wch:24}]);
   XLSX.utils.book_append_sheet(wb,ws,"GENERAL");XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(est),"ESTADISTICA");
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fot),"DEPOSITOS");
+  const cc=conciliacion();const con=[["CONCILIACIÓN","",""],["Total reportado","",cc.rep],["Suma leída en boletas","",cc.bol],["Diferencia","",cc.dif],[],["RAZÓN","PASTOR","MONTO"]];
+  cc.cats.forEach(k=>k.items.forEach(x=>con.push([k.t,x.n+" ("+x.d+")",x.v])));con.push([],["Suma de las razones","",r2(cc.cats.reduce((a,k)=>a+k.monto,0))]);
+  const wc=XLSX.utils.aoa_to_sheet(con);wc["!cols"]=[{wch:40},{wch:55},{wch:14}];XLSX.utils.book_append_sheet(wb,wc,"CONCILIACION");
   const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
   bajar(new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),"Reporte_Pastoral_"+MESES[+m-1]+"_"+y+".xlsx")};
 $("bZip").onclick=async()=>{if(!G)return;$("bZip").disabled=true;show($("mGen"),"info","Preparando las fotos, puede tardar un minuto…");
