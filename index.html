@@ -345,7 +345,25 @@ function cuadre(t){
   const d=r2(ref.monto-t);
   if(Math.abs(d)<0.005){show(m,"ok","La app leyó en tu boleta "+q(ref.monto)+". ✓ Cuadra con tu reporte financiero.");b.disabled=false;return}
   show(m,"bad","La app leyó en tu boleta "+q(ref.monto)+" y tu reporte suma "+q(t)+". Tu boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+" que tu reporte financiero: corrige el formulario. Si al ver tu boleta física la cantidad no es "+q(ref.monto)+", la app la leyó mal: toca «Volver a tomar la foto». "+AYUDA_FOTO);
-  b.disabled=true}
+  b.disabled=true;sugerirAjuste(m,d,"fin_",S.pastor.pagaJub,"Si estás seguro de que tu boleta está bien y la diferencia está en el diezmo del pastor:")}
+// Calcula cuánto cambiar en «Diezmos del pastor» (y su jubilación del 20 %) para que el total quede igual a la boleta.
+function ajusteDiezmo(dif,dp,pj){
+  const tot=v=>r2(v+(pj?r2(v*.2):0)),obj=r2(tot(dp)+dif),c0=Math.round((pj?obj/1.2:obj)*100);let best=null;
+  for(let k=-4;k<=4;k++){const v=(c0+k)/100;if(v<0)continue;const e=Math.abs(tot(v)-obj);if(best===null||e<best.e-1e-9)best={v,e}}
+  return best?{nuevo:best.v,exacto:best.e<0.005,resta:r2(obj-tot(best.v))}:null}
+function sugerirAjuste(box,dif,pref,pj,intro){
+  const dp=num($(pref+"diezPastor").value),a=ajusteDiezmo(dif,dp,pj);if(!a)return;
+  const ddp=r2(a.nuevo-dp),jp0=pj?r2(dp*.2):0,jp1=pj?r2(a.nuevo*.2):0,djp=r2(jp1-jp0);
+  const d=document.createElement("div");d.style.marginTop="8px";d.style.paddingTop="8px";d.style.borderTop="1px dashed currentColor";
+  if(a.nuevo<0||(dif<0&&dp<=0)){d.textContent="No se puede cuadrar quitando del diezmo del pastor: revisa los demás rubros.";box.append(d);return}
+  const verbo=ddp>=0?"Aumenta":"Quita",t1=document.createElement("b");t1.textContent="Sugerencia para cuadrar: ";
+  let txt=intro+" "+verbo.toLowerCase()+" "+q(Math.abs(ddp))+" en Diezmos del pastor (queda en "+q(a.nuevo)+")";
+  txt+=pj?" y la Jubilación del pastor "+(djp>=0?"sube":"baja")+" "+q(Math.abs(djp))+" (queda en "+q(jp1)+")":"";
+  txt+=a.exacto?". Con eso el total queda igual a la boleta.":". Aun así quedaría una diferencia de "+q(Math.abs(a.resta))+" que debes ajustar en otro rubro.";
+  d.append(t1,document.createTextNode(txt));
+  const bt=document.createElement("button");bt.type="button";bt.className="btn";bt.style.cssText="display:block;margin-top:8px;padding:7px 14px";bt.textContent=verbo+" "+q(Math.abs(ddp))+" al diezmo del pastor";
+  bt.onclick=()=>{const i=$(pref+"diezPastor");i.value=a.nuevo.toFixed(2);i.dispatchEvent(new Event("input",{bubbles:true}))};
+  d.append(bt);box.append(d)}
 async function reducir(file){
   const img=await createImageBitmap(file).catch(()=>null);if(!img)throw new Error("No se pudo abrir la foto. Tómela de nuevo.");
   const max=1600,s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement("canvas");
@@ -494,7 +512,7 @@ function calcEd(){
   const t=r2(FIN.reduce((a,x)=>a+num($("ed_"+x.k).value),0)),m=r2(num($("ed_monto").value)),b=$("ed_guardar"),d=r2(m-t);
   if(!(m>0)){show($("ed_msg"),"info","El reporte suma "+q(t)+". Escriba el monto de la boleta.");b.disabled=true}
   else if(Math.abs(d)<0.005){show($("ed_msg"),"ok","El reporte suma "+q(t)+". ✓ Cuadra con la boleta.");b.disabled=false}
-  else{show($("ed_msg"),"bad","El reporte suma "+q(t)+" y la boleta "+q(m)+": la boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+". Corrija antes de guardar.");b.disabled=true}
+  else{show($("ed_msg"),"bad","El reporte suma "+q(t)+" y la boleta "+q(m)+": la boleta tiene "+q(Math.abs(d))+(d<0?" menos":" de más")+". Corrija antes de guardar.");b.disabled=true;sugerirAjuste($("ed_msg"),d,"ed_",ED.f.pastor.pagaJub!==false,"Si la boleta está bien y la diferencia está en el diezmo del pastor:")}
   return t}
 async function guardarEd(){
   const d={};FIN.forEach(x=>d[x.k]=num($("ed_"+x.k).value));d.misionero=$("ed_misionero").value.trim();
